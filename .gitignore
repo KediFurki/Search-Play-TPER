@@ -1,0 +1,21 @@
+# Build output
+build/
+target/
+*.class
+
+# Eclipse IDE files
+.classpath
+.project
+.settings/
+.svn/
+
+# IDE - IntelliJ
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# OS files
+Thumbs.db
+.DS_Store
