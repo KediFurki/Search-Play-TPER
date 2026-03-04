@@ -20,7 +20,11 @@
     <enabled>true</enabled>
     <async-supported>false</async-supported>
   </servlet>
-  
+
+  <session-config>
+    <session-timeout>30</session-timeout>
+  </session-config>
+
   <welcome-file-list>
     <welcome-file>index.html</welcome-file>
     <welcome-file>index.jsp</welcome-file>
@@ -29,4 +33,11 @@
     <welcome-file>default.jsp</welcome-file>
     <welcome-file>default.htm</welcome-file>
   </welcome-file-list>
+
+  <jsp-config>
+    <taglib>
+      <taglib-uri>jakarta.tags.core</taglib-uri>
+      <taglib-location>/WEB-INF/c.tld</taglib-location>
+    </taglib>
+  </jsp-config>
 </web-app>

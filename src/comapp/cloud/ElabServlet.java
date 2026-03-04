@@ -44,10 +44,22 @@ public class ElabServlet extends HttpServlet implements Servlet {
 		}
 	}
 	public void destroy() {
-	    if (scheduleManager!= null) {
+	    if (scheduleManager != null) {
 	    	scheduleManager.cancel(true);
 	    }
-		log.log(Level.SEVERE,"END-> Stop scheduler");
+	    if (scheduledExecutor != null && !scheduledExecutor.isShutdown()) {
+	    	scheduledExecutor.shutdownNow();
+	    	try {
+	    		if (!scheduledExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+	    			log.warning("END-> ScheduledExecutorService did not terminate within 5 seconds.");
+	    		}
+	    	} catch (InterruptedException ie) {
+	    		scheduledExecutor.shutdownNow();
+	    		Thread.currentThread().interrupt();
+	    	}
+	    }
+	    log.info("END-> ScheduledExecutorService shutdown initiated.");
+		log.log(Level.SEVERE, "END-> Stop scheduler - all resources released.");
 	}
 		
 	private long millisToStartDay() {
