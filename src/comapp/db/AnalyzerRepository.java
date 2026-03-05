@@ -222,7 +222,6 @@ public class AnalyzerRepository {
                     }
                 }
             }
-
             log.info("AnalyzerRepository.searchCallsInDatabase() - Query completed. "
                     + "pageResults=" + results.size() + ", totalCount=" + totalCount);
 
@@ -230,7 +229,6 @@ public class AnalyzerRepository {
             log.log(Level.SEVERE,
                     "AnalyzerRepository.searchCallsInDatabase() - Error occurred during database query", e);
         }
-
         log.info("AnalyzerRepository.searchCallsInDatabase() - EXIT - resultSize=" + results.size()
                 + ", totalCount=" + totalCount);
 

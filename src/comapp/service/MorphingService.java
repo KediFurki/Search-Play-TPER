@@ -56,20 +56,17 @@ public class MorphingService {
             URL url = new URL(audioUrl);
             InputStream urlStream = url.openStream();
             orgAudio = AudioSystem.getAudioInputStream(new BufferedInputStream(urlStream));
-
+            
             AudioFormat audioFormat = orgAudio.getFormat();
             log.info("MorphingService.processAudio() - Original AudioFormat: " + audioFormat);
-
             log.info("MorphingService.processAudio() - Converting to mono...");
             audioMono = convertingToMono(orgAudio, audioFormat);
             audioFormat = audioMono.getFormat();
             log.info("MorphingService.processAudio() - AudioFormat after convertingToMono: " + audioFormat);
-
             log.info("MorphingService.processAudio() - Removing first " + nSeconds + " seconds...");
             silenceAudio = removeNSeconds(audioMono, nSeconds);
             audioFormat = silenceAudio.getFormat();
             log.info("MorphingService.processAudio() - AudioFormat after removeNSeconds: " + audioFormat);
-
             log.info("MorphingService.processAudio() - Applying changeVoice "
                     + "(pitchFactor=" + pitchFactor + ", camouflageFactor=" + camouflageFactor + ")...");
             try {
@@ -81,11 +78,10 @@ public class MorphingService {
             }
             audioFormat = voiceChanged.getFormat();
             log.info("MorphingService.processAudio() - AudioFormat after changeVoice: " + audioFormat);
-
             log.info("MorphingService.processAudio() - Writing morphed audio to ByteArrayOutputStream...");
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             AudioSystem.write(voiceChanged, AudioFileFormat.Type.WAVE, baos);
-
+            
             byte[] resultBytes = baos.toByteArray();
             log.info("MorphingService.processAudio() - EXIT - Morphed WAV size=" + resultBytes.length + " bytes");
 
@@ -109,7 +105,6 @@ public class MorphingService {
             log.info("MorphingService.convertingToMono() - Already mono, returning original stream.");
             return orgAudio;
         }
-
         AudioFormat monoFormat = new AudioFormat(
                 audioFormat.getSampleRate(),
                 audioFormat.getSampleSizeInBits(),
@@ -127,7 +122,6 @@ public class MorphingService {
         AudioFormat audioFormat = audioMono.getFormat();
         int bytesPerSecond = (int) (audioFormat.getFrameRate() * audioFormat.getFrameSize());
         int removeLength = bytesPerSecond * nSeconds;
-
         byte[] audioBytes = audioMono.readAllBytes();
         log.info("MorphingService.removeNSeconds() - Original byte length=" + audioBytes.length
                 + ", removeLength=" + removeLength);
@@ -139,7 +133,6 @@ public class MorphingService {
 
         byte[] trimmedBytes = new byte[audioBytes.length - removeLength];
         System.arraycopy(audioBytes, removeLength, trimmedBytes, 0, trimmedBytes.length);
-
         log.info("MorphingService.removeNSeconds() - EXIT - trimmedBytes length=" + trimmedBytes.length);
         return new AudioInputStream(
                 new ByteArrayInputStream(trimmedBytes),

@@ -88,7 +88,6 @@ public class TperService {
         try {
             log.info("[" + sessionId + "] TperService.getMorphedAudioStream() - "
                     + "Fetching recorder list from Genesys for conversationId=" + conversationId + "...");
-
             JSONArray recorderList = Genesys.getRecorderList(guser, conversationId, AudioType.WAV);
 
             if (recorderList == null || recorderList.length() == 0) {
@@ -96,7 +95,6 @@ public class TperService {
                         + "Genesys returned null or empty recorder list for conversationId=" + conversationId);
                 return null;
             }
-
             log.info("[" + sessionId + "] TperService.getMorphedAudioStream() - "
                     + "Recorder list retrieved. recordingCount=" + recorderList.length());
             log.info("[" + sessionId + "] TperService.getMorphedAudioStream() - "
@@ -116,9 +114,8 @@ public class TperService {
                     + "Audio URL obtained: " + audioUrl);
             log.info("[" + sessionId + "] TperService.getMorphedAudioStream() - "
                     + "Delegating to MorphingService.processAudio()...");
-
+            
             morphedStream = morphingService.processAudio(audioUrl);
-
             if (morphedStream != null) {
                 log.info("[" + sessionId + "] TperService.getMorphedAudioStream() - "
                         + "MorphingService returned a valid stream for conversationId=" + conversationId);
@@ -126,17 +123,14 @@ public class TperService {
                 log.warning("[" + sessionId + "] TperService.getMorphedAudioStream() - "
                         + "MorphingService returned null for conversationId=" + conversationId);
             }
-
         } catch (Exception e) {
             log.log(Level.SEVERE,
                     "[" + sessionId + "] TperService.getMorphedAudioStream() - "
                     + "Exception while processing audio for conversationId=" + conversationId, e);
         }
-
         log.info("[" + sessionId + "] TperService.getMorphedAudioStream() - EXIT - "
                 + "conversationId=" + conversationId
                 + ", morphedStreamIsNull=" + (morphedStream == null));
-
         return morphedStream;
     }
     public boolean extendPersonalRetention(String sessionId, GenesysUser guser,
@@ -158,18 +152,16 @@ public class TperService {
 
             int yearsToKeep = Integer.parseInt(
                     ConfigServlet.getProperties().getProperty("retention.years", "17"));
-            log.info("Retention süresi properties dosyasından okundu: " + yearsToKeep + " yıl");
+            log.info("Retention period read from properties file: " + yearsToKeep + " years");
 
             if (yearsToKeep <= 0) {
                 log.warning("[" + sessionId + "] TperService.extendPersonalRetention() - "
                         + "yearsToKeep=" + yearsToKeep + " is invalid (must be > 0). Aborting retention extension.");
                 return false;
             }
-
             log.info("[" + sessionId + "] TperService.extendPersonalRetention() - "
                     + "Input validation passed. conversationId=" + conversationId
                     + ", yearsToKeep=" + yearsToKeep);
-
             int retentionDays = yearsToKeep * 365;
             log.info("[" + sessionId + "] TperService.extendPersonalRetention() - "
                     + "Calculated retention period: " + retentionDays + " days"
@@ -190,37 +182,31 @@ public class TperService {
                         + "Genesys API rejected the retention extension. "
                         + "conversationId=" + conversationId);
             }
-
         } catch (Exception e) {
             log.log(Level.SEVERE,
                     "[" + sessionId + "] TperService.extendPersonalRetention() - "
                     + "Exception while extending retention for conversationId=" + conversationId, e);
             success = false;
         }
-
         log.info("[" + sessionId + "] TperService.extendPersonalRetention() - EXIT - "
                 + "conversationId=" + conversationId
                 + ", success=" + success);
-
         return success;
     }
 
     public boolean revertPersonalRetention(String sessionId, GenesysUser guser,
                                            String conversationId, String conversationStart) {
-
         log.info("[" + sessionId + "] TperService.revertPersonalRetention() - ENTRY - "
                 + "conversationId=" + conversationId
                 + ", conversationStart=" + conversationStart);
 
         boolean success = false;
-
         try {
             if (conversationId == null || conversationId.isBlank()) {
                 log.warning("[" + sessionId + "] TperService.revertPersonalRetention() - "
                         + "conversationId is null or blank. Aborting.");
                 return false;
             }
-
             if (conversationStart == null || conversationStart.isBlank()) {
                 log.warning("[" + sessionId + "] TperService.revertPersonalRetention() - "
                         + "conversationStart is null or blank. Aborting.");
@@ -231,7 +217,6 @@ public class TperService {
                     DateTimeFormatter.ISO_DATE_TIME.withZone(ZoneOffset.UTC));
             ZonedDateTime retentionDate = startDate.plusDays(90);
             String retentionDateIso = retentionDate.format(DateTimeFormatter.ISO_INSTANT);
-
             log.info("[" + sessionId + "] TperService.revertPersonalRetention() - "
                     + "Parsed conversationStart=" + startDate
                     + ", calculated retentionDate (start+90d)=" + retentionDateIso);
@@ -240,7 +225,6 @@ public class TperService {
             log.info("[" + sessionId + "] TperService.revertPersonalRetention() - "
                     + "Retention will expire in " + daysFromNow + " days from now"
                     + " for conversationId=" + conversationId);
-
             log.info("[" + sessionId + "] TperService.revertPersonalRetention() - "
                     + "Sending retention revert request to Genesys API: "
                     + "conversationId=" + conversationId
@@ -257,18 +241,15 @@ public class TperService {
                         + "Genesys API rejected the retention revert. "
                         + "conversationId=" + conversationId);
             }
-
         } catch (Exception e) {
             log.log(Level.SEVERE,
                     "[" + sessionId + "] TperService.revertPersonalRetention() - "
                     + "Exception while reverting retention for conversationId=" + conversationId, e);
             success = false;
         }
-
         log.info("[" + sessionId + "] TperService.revertPersonalRetention() - EXIT - "
                 + "conversationId=" + conversationId
                 + ", success=" + success);
-
         return success;
     }
 }
