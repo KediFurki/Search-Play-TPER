@@ -68,8 +68,8 @@ public class MainController extends HttpServlet {
                 case "playAudio":
                     handlePlayAudio(request, response, session, sessionId);
                     break;
-                case "extendRetention":
-                    handleExtendRetention(request, response, session, sessionId);
+                case "toggleRetention":
+                    handleToggleRetention(request, response, session, sessionId);
                     break;
                 case "login":
                     handleLogin(request, response, sessionId);
@@ -296,66 +296,71 @@ public class MainController extends HttpServlet {
 
         log.info("[" + sessionId + "] MainController.handlePlayAudio() - EXIT - convId=" + conversationId);
     }
-    private void handleExtendRetention(HttpServletRequest request, HttpServletResponse response,
+    private void handleToggleRetention(HttpServletRequest request, HttpServletResponse response,
                                        HttpSession session, String sessionId)
             throws ServletException, IOException {
-        log.info("[" + sessionId + "] MainController.handleExtendRetention() - ENTRY");
+
+        log.info("[" + sessionId + "] MainController.handleToggleRetention() - ENTRY");
+
+        response.setContentType("text/plain");
+        response.setCharacterEncoding("UTF-8");
 
         if (session == null) {
-            log.warning("[" + sessionId + "] MainController.handleExtendRetention() - "
-                    + "No active session. Redirecting to relogin.jsp.");
-            request.setAttribute("message", "Your session has expired. Please log in again.");
-            request.getRequestDispatcher("/relogin.jsp").forward(request, response);
+            log.warning("[" + sessionId + "] MainController.handleToggleRetention() - No active session. Returning 401.");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("error:no_session");
             return;
         }
 
         GenesysUser guser = (GenesysUser) session.getAttribute("guser");
         if (guser == null) {
-            log.warning("[" + sessionId + "] MainController.handleExtendRetention() - "
-                    + "guser is null. Redirecting to relogin.jsp.");
-            request.setAttribute("message", "Your session has expired. Please log in again.");
-            request.getRequestDispatcher("/relogin.jsp").forward(request, response);
+            log.warning("[" + sessionId + "] MainController.handleToggleRetention() - guser is null. Returning 401.");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("error:no_session");
             return;
         }
-        log.info("[" + sessionId + "] MainController.handleExtendRetention() - guser=" + guser);
 
-        String conversationId = request.getParameter("convId");
-        log.info("[" + sessionId + "] MainController.handleExtendRetention() - convId=" + conversationId);
+        String conversationId = request.getParameter("conversationId");
+        String convStart      = request.getParameter("convStart");
+        String lockState      = request.getParameter("lockState");
+
+        log.info("[" + sessionId + "] MainController.handleToggleRetention() - "
+                + "Parameters: conversationId=" + conversationId
+                + ", convStart=" + convStart
+                + ", lockState=" + lockState);
 
         if (StringUtils.isBlank(conversationId)) {
-            log.warning("[" + sessionId + "] MainController.handleExtendRetention() - "
-                    + "convId is blank. Setting error message and forwarding to /SearchCall.jsp.");
-            request.setAttribute("retentionMsg", "Conversation ID is missing. Cannot extend retention.");
-            request.getRequestDispatcher("/SearchCall.jsp").forward(request, response);
+            log.warning("[" + sessionId + "] MainController.handleToggleRetention() - conversationId is blank. Returning 400.");
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().write("error:missing_conversation_id");
             return;
         }
 
-        log.info("[" + sessionId + "] MainController.handleExtendRetention() - "
-                + "Final parameters: convId=" + conversationId);
+        boolean success;
 
-        log.info("[" + sessionId + "] MainController.handleExtendRetention() - "
-                + "Calling TperService.extendPersonalRetention()...");
-
-        boolean success = tperService.extendPersonalRetention(sessionId, guser, conversationId);
-
-        log.info("[" + sessionId + "] MainController.handleExtendRetention() - "
-                + "Service returned success=" + success + " for convId=" + conversationId);
-
-        if (success) {
-            String msg = "Retention extended successfully for conversation " + conversationId + ".";
-            log.info("[" + sessionId + "] MainController.handleExtendRetention() - " + msg);
-            request.setAttribute("retentionMsg", msg);
+        if ("true".equalsIgnoreCase(lockState)) {
+            log.info("[" + sessionId + "] MainController.handleToggleRetention() - "
+                    + "lockState=true -> Extending retention (17 years) for conversationId=" + conversationId);
+            success = tperService.extendPersonalRetention(sessionId, guser, conversationId);
         } else {
-            String msg = "Failed to extend retention for conversation " + conversationId
-                    + ". Please try again later.";
-            log.warning("[" + sessionId + "] MainController.handleExtendRetention() - " + msg);
-            request.setAttribute("retentionMsg", msg);
+            log.info("[" + sessionId + "] MainController.handleToggleRetention() - "
+                    + "lockState=false -> Reverting retention (start+90 days) for conversationId=" + conversationId);
+            success = tperService.revertPersonalRetention(sessionId, guser, conversationId, convStart);
         }
 
-        log.info("[" + sessionId + "] MainController.handleExtendRetention() - Forwarding to /SearchCall.jsp");
-        request.getRequestDispatcher("/SearchCall.jsp").forward(request, response);
+        log.info("[" + sessionId + "] MainController.handleToggleRetention() - "
+                + "Service returned success=" + success + " for conversationId=" + conversationId);
 
-        log.info("[" + sessionId + "] MainController.handleExtendRetention() - EXIT");
+        if (success) {
+            response.getWriter().write("success");
+            log.info("[" + sessionId + "] MainController.handleToggleRetention() - Responded with 'success'.");
+        } else {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.getWriter().write("error:api_failure");
+            log.warning("[" + sessionId + "] MainController.handleToggleRetention() - Responded with 'error:api_failure'.");
+        }
+
+        log.info("[" + sessionId + "] MainController.handleToggleRetention() - EXIT");
     }
 
     private void handleLogin(HttpServletRequest request, HttpServletResponse response,

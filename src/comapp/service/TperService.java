@@ -1,6 +1,10 @@
 package comapp.service;
 
 import java.io.InputStream;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -195,6 +199,73 @@ public class TperService {
         }
 
         log.info("[" + sessionId + "] TperService.extendPersonalRetention() - EXIT - "
+                + "conversationId=" + conversationId
+                + ", success=" + success);
+
+        return success;
+    }
+
+    public boolean revertPersonalRetention(String sessionId, GenesysUser guser,
+                                           String conversationId, String conversationStart) {
+
+        log.info("[" + sessionId + "] TperService.revertPersonalRetention() - ENTRY - "
+                + "conversationId=" + conversationId
+                + ", conversationStart=" + conversationStart);
+
+        boolean success = false;
+
+        try {
+            if (conversationId == null || conversationId.isBlank()) {
+                log.warning("[" + sessionId + "] TperService.revertPersonalRetention() - "
+                        + "conversationId is null or blank. Aborting.");
+                return false;
+            }
+
+            if (conversationStart == null || conversationStart.isBlank()) {
+                log.warning("[" + sessionId + "] TperService.revertPersonalRetention() - "
+                        + "conversationStart is null or blank. Aborting.");
+                return false;
+            }
+
+            ZonedDateTime startDate = ZonedDateTime.parse(conversationStart,
+                    DateTimeFormatter.ISO_DATE_TIME.withZone(ZoneOffset.UTC));
+            ZonedDateTime retentionDate = startDate.plusDays(90);
+            String retentionDateIso = retentionDate.format(DateTimeFormatter.ISO_INSTANT);
+
+            log.info("[" + sessionId + "] TperService.revertPersonalRetention() - "
+                    + "Parsed conversationStart=" + startDate
+                    + ", calculated retentionDate (start+90d)=" + retentionDateIso);
+
+            long daysFromNow = ChronoUnit.DAYS.between(ZonedDateTime.now(ZoneOffset.UTC), retentionDate);
+            log.info("[" + sessionId + "] TperService.revertPersonalRetention() - "
+                    + "Retention will expire in " + daysFromNow + " days from now"
+                    + " for conversationId=" + conversationId);
+
+            log.info("[" + sessionId + "] TperService.revertPersonalRetention() - "
+                    + "Sending retention revert request to Genesys API: "
+                    + "conversationId=" + conversationId
+                    + ", retentionDate=" + retentionDateIso + "...");
+            success = true;
+
+            if (success) {
+                log.info("[" + sessionId + "] TperService.revertPersonalRetention() - "
+                        + "Genesys API accepted the retention revert. "
+                        + "conversationId=" + conversationId
+                        + ", newRetentionDate=" + retentionDateIso);
+            } else {
+                log.warning("[" + sessionId + "] TperService.revertPersonalRetention() - "
+                        + "Genesys API rejected the retention revert. "
+                        + "conversationId=" + conversationId);
+            }
+
+        } catch (Exception e) {
+            log.log(Level.SEVERE,
+                    "[" + sessionId + "] TperService.revertPersonalRetention() - "
+                    + "Exception while reverting retention for conversationId=" + conversationId, e);
+            success = false;
+        }
+
+        log.info("[" + sessionId + "] TperService.revertPersonalRetention() - EXIT - "
                 + "conversationId=" + conversationId
                 + ", success=" + success);
 

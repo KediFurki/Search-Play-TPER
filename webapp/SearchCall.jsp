@@ -12,9 +12,11 @@
     <style>
         html, body {
             font: 12px "Roboto", Cairo, Sans-serif;
+            line-height: normal;
             line-height: 20px;
             color: #555;
             margin: 0;
+            background-color: #fff;
         }
 
         .uk-tile {
@@ -33,7 +35,6 @@
             padding: 0;
             padding-left: 7px;
             padding-right: 7px;
-            cursor: pointer;
             border: 0px;
             text-transform: none;
         }
@@ -56,29 +57,29 @@
             background-color: rgb(176, 255, 194);
         }
 
-        td {
+        .select {
+            border: 1px #ccc solid !important;
+            color: #CCC;
+        }
+        #resizeMe td {
             padding: 5px;
             border-bottom: 1px #CCC solid;
             text-overflow: ellipsis;
             white-space: nowrap;
-            max-width: 2px;
             overflow: hidden;
-            text-align: left;
+            text-align: center;
             cursor: pointer;
         }
 
-        .uk-table th {
+        #resizeMe th {
             vertical-align: middle;
-            padding-left: 0px;
-            padding-right: 0px;
+            padding: 4px 8px;
             text-align: center;
         }
 
-        .uk-table td {
-            padding-top: 5px;
-            padding-bottom: 5px;
+        .resizerTarget {
+            border: 0px;
         }
-
         .bottom {
             position: fixed;
             bottom: 0;
@@ -89,9 +90,13 @@
             z-index: 10;
         }
 
-        .select {
-            border: 1px #ccc solid !important;
-            color: #CCC;
+        .bottom td {
+            padding: 5px;
+            border: 0px;
+            text-overflow: clip;
+            white-space: normal;
+            overflow: visible;
+            cursor: default;
         }
 
         .clear-all {
@@ -100,19 +105,17 @@
         }
 
         .search-panel {
-            background-color: #f8f8f8;
+            background-color: #fafafa;
             border: 1px solid #e5e5e5;
             border-radius: 4px;
             padding: 15px;
         }
 
-        /* Tablo responsive - dar ekranlarda yatay scroll */
         .table-wrapper {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
 
-        /* Genesys Cloud Apps embed uyumu */
         @media (max-width: 900px) {
             .uk-button-small {
                 font-size: 10px;
@@ -126,8 +129,6 @@
     </style>
 </head>
 <body>
-
-<!-- ======== NAVBAR (Referans: main.jsp üst bar yapısı) ======== -->
 <nav class="uk-navbar-container" uk-navbar style="background-color: #44444E; padding-left: 10px; padding-right: 10px;">
     <div class="uk-navbar-left">
         <a class="uk-navbar-item uk-logo" href="#" style="color: white; font-weight: bold; text-decoration: none; font-size: 14px;">
@@ -155,23 +156,12 @@
         </div>
     </div>
 </nav>
-
-<!-- ======== ALERTS ======== -->
-<c:if test="${not empty retentionMsg}">
-    <div class="uk-alert-primary uk-margin-small-top uk-margin-small-left uk-margin-small-right" uk-alert>
-        <a class="uk-alert-close" uk-close></a>
-        <p><c:out value="${retentionMsg}"/></p>
-    </div>
-</c:if>
-
 <c:if test="${not empty error}">
     <div class="uk-alert-danger uk-margin-small-top uk-margin-small-left uk-margin-small-right" uk-alert>
         <a class="uk-alert-close" uk-close></a>
         <p><c:out value="${error}"/></p>
     </div>
 </c:if>
-
-<!-- ======== SEARCH FORM (Referans: main.jsp + CallList.jsp arama yapısı) ======== -->
 <div style="margin: 10px 15px 0 15px;">
     <form id="searchForm" action="<c:url value='tperApp'/>" method="post">
         <input type="hidden" name="action" value="searchCall" />
@@ -234,8 +224,6 @@
         </div>
     </form>
 </div>
-
-<!-- ======== RESULTS TABLE (Referans: CallList.jsp tablo yapısı) ======== -->
 <div style="height: 100%; padding-left: 10px; padding-right: 10px;">
     <div class="table-wrapper">
     <table id="resizeMe" class="uk-table uk-table-hover uk-table-divider" style="width: 100%; margin-bottom: 95px; margin-top: 10px;">
@@ -275,14 +263,12 @@
                             <td style="text-align: center;">
                                 <span style="width:30px; cursor:pointer;" uk-icon="icon: play-circle;"
                                       onclick="playAudio('row-${st.index}', '${call.conversationid}')"></span>
-                                <form action="<c:url value='tperApp'/>" method="post" style="display:inline;">
-                                    <input type="hidden" name="action" value="extendRetention" />
-                                    <input type="hidden" name="convId" value="${call.conversationid}" />
-                                    <button type="submit" class="uk-button uk-button-default uk-button-small"
-                                            onclick="return confirm('Extend retention for this call?');">
-                                        <span uk-icon="icon: lock"></span> Extend
-                                    </button>
-                                </form>
+                                <button type="button" class="uk-icon-button"
+                                        data-locked="false"
+                                        uk-icon="icon: unlock"
+                                        onclick="toggleRetention(this, '${call.conversationid}', '${call.conversationstart}')"
+                                        title="Retention: 90 Days (Click to Lock for 17 Years)"
+                                        uk-tooltip></button>
                             </td>
                         </tr>
                     </c:forEach>
@@ -308,8 +294,6 @@
         </audio>
     </div>
 </div>
-
-<!-- ======== LOADING MODAL (Referans: CallList.jsp ricerca in corso) ======== -->
 <div id="loadingModal" uk-modal="bg-close: false; esc-close: false;">
     <div class="uk-modal-dialog uk-modal-body uk-text-center"
          style="width: fit-content; border-radius: 4px;">
@@ -317,8 +301,6 @@
         <div class="uk-margin-small-top">Loading...</div>
     </div>
 </div>
-
-<!-- ======== AUDIO LOADING MODAL ======== -->
 <div id="modal-attesa-audio" uk-modal="bg-close: false; esc-close: false;">
     <div class="uk-modal-dialog uk-modal-body uk-text-center">
         <h2 class="uk-modal-title" style="color: #44444E;">Please wait...</h2>
@@ -326,13 +308,16 @@
         <div uk-spinner="ratio: 2"></div>
     </div>
 </div>
-
-<!-- ======== BOTTOM PAGINATION BAR (Referans: CallList.jsp sayfalama) ======== -->
 <c:if test="${not empty conversations and totalHits > 0}">
     <div class="bottom">
-        <table style="width: 100%;" class="uk-margin-small-top">
+        <table style="width: 100%; table-layout: fixed;" class="uk-margin-small-top">
+            <colgroup>
+                <col style="width: 100px;">
+                <col>
+                <col style="width: 380px;">
+            </colgroup>
             <tr>
-                <td style="border: 0px; text-align: left;">
+                <td style="border: 0px; text-align: left; white-space: nowrap;">
                     <button class="uk-button uk-button-link uk-button-small">
                         <c:choose>
                             <c:when test="${currentpage * pageSize > totalHits}">
@@ -350,7 +335,7 @@
                         <source id="_player" src="" type="audio/mpeg">
                     </audio>
                 </td>
-                <td style="border: 0px; text-align: right;">
+                <td style="border: 0px; text-align: right; white-space: nowrap;">
                     <span>
                         <button class="uk-button uk-button-default uk-button-small"
                                 onclick="goToPage(1)"
@@ -375,15 +360,12 @@
 </c:if>
 
 <script>
-    /* ===== Clear All Button (Referans: main.jsp) ===== */
     document.getElementById('clear-all-btn').addEventListener('click', function() {
         var inputs = document.querySelectorAll('.search-panel .uk-input');
         inputs.forEach(function(input) {
             input.value = '';
         });
     });
-
-    /* ===== Play Audio ===== */
     function playAudio(rowId, conversationId) {
         document.querySelectorAll("tr").forEach(function(r) {
             r.classList.remove("highlight");
@@ -408,15 +390,11 @@
             UIkit.modal.alert('Error loading or processing audio.');
         };
     }
-
-    /* ===== Pagination ===== */
     function goToPage(page) {
         document.getElementById("currentpage").value = page;
         UIkit.modal("#loadingModal").show();
         document.getElementById("searchForm").submit();
     }
-
-    /* ===== Order Toggle ===== */
     function toggleOrder() {
         var orderField = document.getElementById("order");
         orderField.value = (orderField.value === "desc") ? "asc" : "desc";
@@ -424,8 +402,6 @@
         UIkit.modal("#loadingModal").show();
         document.getElementById("searchForm").submit();
     }
-
-    /* ===== Page Buttons (Referans: CallList.jsp sayfalama butonları) ===== */
     (function() {
         var current    = parseInt("${not empty currentpage ? currentpage : 1}", 10);
         var totalPages = parseInt("${not empty totalPages ? totalPages : 0}", 10);
@@ -468,8 +444,6 @@
             container.appendChild(lastBtn);
         }
     })();
-
-    /* ===== Session Timeout (Referans: main.jsp + CallList.jsp scadenzaSessione) ===== */
     function scadenzaSessione() {
         localStorage.clear();
         sessionStorage.clear();
@@ -480,7 +454,7 @@
             });
     }
 
-    var sessionTimeoutMs = 30 * 60 * 1000; // 30 minutes
+    var sessionTimeoutMs = 30 * 60 * 1000;
     var timeoutTimer;
 
     function resetTimer() {
@@ -493,6 +467,65 @@
     document.onclick     = resetTimer;
 
     resetTimer();
+    function toggleRetention(btn, convId, convStart) {
+        var currentlyLocked = btn.getAttribute('data-locked') === 'true';
+        var newLockState = !currentlyLocked;
+
+        console.log('[toggleRetention] convId=' + convId
+                   + ', currentlyLocked=' + currentlyLocked
+                   + ', newLockState=' + newLockState);
+        btn.disabled = true;
+
+        var url = "<c:url value='tperApp'/>";
+        var params = "action=toggleRetention"
+                   + "&conversationId=" + encodeURIComponent(convId)
+                   + "&convStart=" + encodeURIComponent(convStart)
+                   + "&lockState=" + newLockState;
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", url, true);
+        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                btn.disabled = false;
+
+                if (xhr.status === 200 && xhr.responseText === "success") {
+                    console.log('[toggleRetention] Success. newLockState=' + newLockState);
+
+                    btn.setAttribute('data-locked', String(newLockState));
+
+                    if (newLockState) {
+                        btn.setAttribute('uk-icon', 'icon: lock');
+                        btn.style.backgroundColor = '#44444E';
+                        btn.style.color = '#fff';
+                        btn.setAttribute('title', 'Locked: 17 Years (Click to Unlock)');
+                        UIkit.notification({message: 'Retention locked for 17 years.', status: 'success', pos: 'top-right', timeout: 3000});
+                    } else {
+                        btn.setAttribute('uk-icon', 'icon: unlock');
+                        btn.style.backgroundColor = 'transparent';
+                        btn.style.color = '';
+                        btn.setAttribute('title', 'Retention: 90 Days (Click to Lock for 17 Years)');
+                        UIkit.notification({message: 'Retention reverted to 90 days.', status: 'primary', pos: 'top-right', timeout: 3000});
+                    }
+                    UIkit.icon(btn);
+                    UIkit.tooltip(btn);
+
+                } else if (xhr.status === 401) {
+                    console.log('[toggleRetention] Session expired (401). Redirecting...');
+                    UIkit.modal.alert('Session expired. You will be redirected to the login page.')
+                        .then(function() {
+                            window.location.href = "<c:url value='tperApp?action=logout'/>";
+                        });
+                } else {
+                    console.log('[toggleRetention] Error. status=' + xhr.status + ', response=' + xhr.responseText);
+                    UIkit.notification({message: 'Failed to toggle retention. Please try again.', status: 'danger', pos: 'top-right', timeout: 4000});
+                }
+            }
+        };
+
+        xhr.send(params);
+    }
 </script>
 </body>
 </html>
