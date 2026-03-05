@@ -177,6 +177,46 @@ public class Genesys {
 
 	}
 
+	public static void fetchUserGroups(GenesysUser guser) {
+		List<String> groups = new ArrayList<>();
+		try {
+			log.log(Level.INFO, "[" + guser.sessionId + "] Genesys.fetchUserGroups() - "
+					+ "Fetching user groups from /api/v2/users/me?expand=groups ...");
+
+			JSONObject userMe = getUserMe(guser, "groups");
+
+			if (userMe == null) {
+				log.warning("[" + guser.sessionId + "] Genesys.fetchUserGroups() - "
+						+ "getUserMe returned null. Assigning empty group list.");
+				guser.setUserGroups(groups);
+				return;
+			}
+
+			JSONArray groupsArray = userMe.optJSONArray("groups");
+			if (groupsArray != null && groupsArray.length() > 0) {
+				for (int i = 0; i < groupsArray.length(); i++) {
+					JSONObject groupObj = groupsArray.optJSONObject(i);
+					if (groupObj != null) {
+						String groupName = groupObj.optString("name", "");
+						if (StringUtils.isNotBlank(groupName)) {
+							groups.add(groupName);
+						}
+					}
+				}
+			}
+
+			log.info("[" + guser.sessionId + "] Genesys.fetchUserGroups() - "
+					+ "Groups parsed successfully. count=" + groups.size()
+					+ ", groups=" + groups);
+
+		} catch (Exception e) {
+			log.log(Level.SEVERE, "[" + guser.sessionId + "] Genesys.fetchUserGroups() - "
+					+ "Error while fetching/parsing user groups. Assigning empty list.", e);
+			groups = new ArrayList<>();
+		}
+		guser.setUserGroups(groups);
+	}
+
 	public static JSONObject recorderCommand(GenesysUser guser, String conversationId, String recordingState) {
 		try {
 			String urlString = prefixApi + guser.urlRegion + "/api/v2/conversations/calls/" + conversationId;

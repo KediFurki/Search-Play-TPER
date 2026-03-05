@@ -3,25 +3,22 @@ package comapp.controller;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.commons.lang3.StringUtils;
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import comapp.ConfigServlet;
+import comapp.cloud.Genesys;
 import comapp.cloud.GenesysUser;
 import comapp.service.TperService;
 
@@ -82,8 +79,13 @@ public class MainController extends HttpServlet {
                     break;
                 default:
                     log.warning("[" + sessionId + "] MainController.processRequest() - Unknown or empty action: '"
-                            + action + "'. Forwarding to /SearchCall.jsp as default.");
-                    request.getRequestDispatcher("/SearchCall.jsp").forward(request, response);
+                            + action + "'. Checking session...");
+                    if (session == null || session.getAttribute("guser") == null) {
+                        log.info("[" + sessionId + "] MainController.processRequest() - No session/guser. Triggering login.");
+                        handleLogin(request, response, sessionId);
+                    } else {
+                        request.getRequestDispatcher("/SearchCall.jsp").forward(request, response);
+                    }
                     break;
             }
         } catch (Exception e) {
@@ -102,19 +104,19 @@ public class MainController extends HttpServlet {
         log.info("[" + sessionId + "] MainController.handleSearchCall() - ENTRY");
 
         if (session == null) {
-            log.warning("[" + sessionId + "] MainController.handleSearchCall() - No active session. Redirecting to index.jsp.");
-            response.sendRedirect("index.jsp");
+            log.warning("[" + sessionId + "] MainController.handleSearchCall() - No active session. Redirecting to relogin.jsp.");
+            request.setAttribute("message", "Your session has expired. Please log in again.");
+            request.getRequestDispatcher("/relogin.jsp").forward(request, response);
             return;
         }
 
         GenesysUser guser = (GenesysUser) session.getAttribute("guser");
         if (guser == null) {
-            log.warning("[" + sessionId + "] MainController.handleSearchCall() - guser is null. Invalidating session and redirecting to index.jsp.");
-            session.invalidate();
-            response.sendRedirect("index.jsp");
+            log.warning("[" + sessionId + "] MainController.handleSearchCall() - guser is null. Redirecting to relogin.jsp.");
+            request.setAttribute("message", "Your session has expired. Please log in again.");
+            request.getRequestDispatcher("/relogin.jsp").forward(request, response);
             return;
         }
-
         log.info("[" + sessionId + "] MainController.handleSearchCall() - guser=" + guser);
 
         String ani      = StringUtils.defaultString(request.getParameter("ani"), "");
@@ -122,6 +124,15 @@ public class MainController extends HttpServlet {
         String dateFrom = StringUtils.defaultString(request.getParameter("from"), "");
         String dateTo   = StringUtils.defaultString(request.getParameter("to"), "");
         String order    = StringUtils.defaultString(request.getParameter("order"), "desc");
+        String conversationId = StringUtils.defaultString(request.getParameter("conversationId"), "");
+        String queue    = StringUtils.defaultString(request.getParameter("queue"), "");
+        String operator = StringUtils.defaultString(request.getParameter("operator"), "");
+
+        @SuppressWarnings("unchecked")
+        List<String> userGroups = (List<String>) session.getAttribute("userGroups");
+        boolean enableGroupFilter = Boolean.parseBoolean(
+                ConfigServlet.getProperties().getProperty("enable_group_filter", "false"));
+
         int currentPage = 1;
         try {
             String cp = request.getParameter("currentpage");
@@ -133,7 +144,7 @@ public class MainController extends HttpServlet {
         }
 
         Properties cs = ConfigServlet.getProperties();
-        int pageSize = 10;
+        int pageSize = 50;
         try {
             String ps = cs.getProperty("pageSize");
             if (ps != null) {
@@ -148,6 +159,11 @@ public class MainController extends HttpServlet {
                 + ", dnis=" + dnis
                 + ", from=" + dateFrom
                 + ", to=" + dateTo
+                + ", conversationId=" + conversationId
+                + ", queue=" + queue
+                + ", operator=" + operator
+                + ", enableGroupFilter=" + enableGroupFilter
+                + ", userGroups=" + userGroups
                 + ", order=" + order
                 + ", currentPage=" + currentPage
                 + ", pageSize=" + pageSize);
@@ -159,111 +175,33 @@ public class MainController extends HttpServlet {
                 + "dateFromFormatted=" + dateFromFormatted
                 + ", dateToFormatted=" + dateToFormatted);
 
-        JSONObject result = tperService.searchCalls(sessionId, guser,
+        Map<String, Object> searchResult = tperService.searchCalls(sessionId, guser,
                 dateFromFormatted, dateToFormatted,
-                ani, dnis,
+                ani, dnis, conversationId, queue, operator,
+                userGroups, enableGroupFilter,
                 currentPage, pageSize, order);
 
-        log.info("[" + sessionId + "] MainController.handleSearchCall() - Service returned result="
-                + (result != null ? "non-null" : "null"));
-
         List<Map<String, String>> conversations = new ArrayList<>();
-        int totalHits  = 0;
-        int totalPages = 0;
+        int totalHits = 0;
 
-        if (result != null) {
-            totalHits = result.optInt("totalHits", 0);
-            totalPages = (int) Math.ceil((double) totalHits / pageSize);
-
-            log.info("[" + sessionId + "] MainController.handleSearchCall() - "
-                    + "totalHits=" + totalHits + ", totalPages=" + totalPages);
-
-            JSONArray convArray = result.optJSONArray("conversations");
-            if (convArray != null) {
-                log.info("[" + sessionId + "] MainController.handleSearchCall() - "
-                        + "Converting " + convArray.length() + " conversations to List<Map>...");
-
-                for (int i = 0; i < convArray.length(); i++) {
-                  try {
-                    JSONObject conv = convArray.getJSONObject(i);
-                    Map<String, String> row = new LinkedHashMap<>();
-
-                    row.put("conversationId", conv.optString("conversationId", ""));
-                    row.put("conversationStart", conv.optString("conversationStart", ""));
-                    row.put("conversationEnd", conv.optString("conversationEnd", ""));
-                    row.put("originatingDirection", conv.optString("originatingDirection", ""));
-
-                    try {
-                        ZonedDateTime utcStart = ZonedDateTime.parse(conv.getString("conversationStart"));
-                        ZonedDateTime rome = utcStart.withZoneSameInstant(ZoneId.of("Europe/Rome"));
-                        String formatted = rome.format(
-                                DateTimeFormatter.ofPattern("E, dd MMM, yyyy HH:mm", Locale.ENGLISH));
-                        row.put("formattedStart", formatted);
-                    } catch (Exception e) {
-                        log.warning("[" + sessionId + "] MainController.handleSearchCall() - "
-                                + "Failed to format conversationStart for index=" + i);
-                        row.put("formattedStart", conv.optString("conversationStart", ""));
-                    }
-                    try {
-                        ZonedDateTime t1 = ZonedDateTime.parse(conv.getString("conversationStart"));
-                        ZonedDateTime t2 = ZonedDateTime.parse(conv.getString("conversationEnd"));
-                        Duration dur = Duration.between(t1, t2);
-                        row.put("duration", dur.toMinutes() + "min, " + (dur.getSeconds() % 60) + "sec");
-                    } catch (Exception e) {
-                        log.warning("[" + sessionId + "] MainController.handleSearchCall() - "
-                                + "Failed to compute duration for index=" + i);
-                        row.put("duration", "N/A");
-                    }
-                    try {
-                        JSONObject firstParticipant = conv.getJSONArray("participants").getJSONObject(0);
-                        JSONObject firstSession = firstParticipant.getJSONArray("sessions").getJSONObject(0);
-                        String direction = firstSession.optString("direction", "");
-
-                        if ("outbound".equalsIgnoreCase(direction)) {
-                            row.put("ani", firstParticipant.optString("userId", ""));
-                        } else {
-                            row.put("ani", firstSession.optString("ani", ""));
-                        }
-                        row.put("dnis", firstSession.optString("dnis", ""));
-                    } catch (Exception e) {
-                        log.warning("[" + sessionId + "] MainController.handleSearchCall() - "
-                                + "Failed to extract participant data for index=" + i);
-                        row.put("ani", "N/A");
-                        row.put("dnis", "N/A");
-                    }
-                    try {
-                        JSONArray divs = conv.optJSONArray("divisionIds");
-                        if (divs != null) {
-                            StringBuilder sb = new StringBuilder();
-                            for (int d = 0; d < divs.length(); d++) {
-                                if (d > 0) sb.append(", ");
-                                sb.append(divs.getString(d));
-                            }
-                            row.put("divisionIds", sb.toString());
-                        } else {
-                            row.put("divisionIds", "");
-                        }
-                    } catch (Exception e) {
-                        row.put("divisionIds", "");
-                    }
-
-                    conversations.add(row);
-                  } catch (Exception e) {
-                    log.log(Level.WARNING, "[" + sessionId + "] MainController.handleSearchCall() - "
-                            + "Failed to parse conversation at index=" + i, e);
-                  }
-                }
-
-                log.info("[" + sessionId + "] MainController.handleSearchCall() - "
-                        + "Conversion complete. conversationsSize=" + conversations.size());
-            } else {
-                log.info("[" + sessionId + "] MainController.handleSearchCall() - "
-                        + "No conversations array in result.");
+        if (searchResult != null) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, String>> resultList = (List<Map<String, String>>) searchResult.get("results");
+            if (resultList != null) {
+                conversations = resultList;
             }
-        } else {
-            log.warning("[" + sessionId + "] MainController.handleSearchCall() - "
-                    + "Result is null, setting empty list.");
+            Object tc = searchResult.get("totalCount");
+            if (tc instanceof Number) {
+                totalHits = ((Number) tc).intValue();
+            }
         }
+
+        int totalPages = (totalHits > 0) ? (int) Math.ceil((double) totalHits / pageSize) : 0;
+
+        log.info("[" + sessionId + "] MainController.handleSearchCall() - "
+                + "totalHits=" + totalHits + ", totalPages=" + totalPages
+                + ", conversationsSize=" + conversations.size());
+
         request.setAttribute("conversations", conversations);
         request.setAttribute("totalHits", totalHits);
         request.setAttribute("totalPages", totalPages);
@@ -274,6 +212,9 @@ public class MainController extends HttpServlet {
         request.setAttribute("from", dateFrom);
         request.setAttribute("to", dateTo);
         request.setAttribute("order", order);
+        request.setAttribute("conversationId", conversationId);
+        request.setAttribute("queue", queue);
+        request.setAttribute("operator", operator);
 
         log.info("[" + sessionId + "] MainController.handleSearchCall() - Forwarding to /SearchCall.jsp");
         request.getRequestDispatcher("/SearchCall.jsp").forward(request, response);
@@ -362,17 +303,18 @@ public class MainController extends HttpServlet {
 
         if (session == null) {
             log.warning("[" + sessionId + "] MainController.handleExtendRetention() - "
-                    + "No active session. Redirecting to index.jsp.");
-            response.sendRedirect("index.jsp");
+                    + "No active session. Redirecting to relogin.jsp.");
+            request.setAttribute("message", "Your session has expired. Please log in again.");
+            request.getRequestDispatcher("/relogin.jsp").forward(request, response);
             return;
         }
 
         GenesysUser guser = (GenesysUser) session.getAttribute("guser");
         if (guser == null) {
             log.warning("[" + sessionId + "] MainController.handleExtendRetention() - "
-                    + "guser is null. Invalidating session and redirecting to index.jsp.");
-            session.invalidate();
-            response.sendRedirect("index.jsp");
+                    + "guser is null. Redirecting to relogin.jsp.");
+            request.setAttribute("message", "Your session has expired. Please log in again.");
+            request.getRequestDispatcher("/relogin.jsp").forward(request, response);
             return;
         }
         log.info("[" + sessionId + "] MainController.handleExtendRetention() - guser=" + guser);
@@ -388,40 +330,19 @@ public class MainController extends HttpServlet {
             return;
         }
 
-        int yearsToKeep = 5;
-        String yearsParam = request.getParameter("years");
         log.info("[" + sessionId + "] MainController.handleExtendRetention() - "
-                + "Raw years parameter=" + yearsParam);
-
-        if (StringUtils.isNotBlank(yearsParam)) {
-            try {
-                yearsToKeep = Integer.parseInt(yearsParam);
-                log.info("[" + sessionId + "] MainController.handleExtendRetention() - "
-                        + "Parsed yearsToKeep=" + yearsToKeep + " from request parameter.");
-            } catch (NumberFormatException e) {
-                log.warning("[" + sessionId + "] MainController.handleExtendRetention() - "
-                        + "Invalid years parameter '" + yearsParam + "'. Defaulting to 5.");
-                yearsToKeep = 5;
-            }
-        } else {
-            log.info("[" + sessionId + "] MainController.handleExtendRetention() - "
-                    + "Years parameter not provided. Using default yearsToKeep=5.");
-        }
-
-        log.info("[" + sessionId + "] MainController.handleExtendRetention() - "
-                + "Final parameters: convId=" + conversationId + ", yearsToKeep=" + yearsToKeep);
+                + "Final parameters: convId=" + conversationId);
 
         log.info("[" + sessionId + "] MainController.handleExtendRetention() - "
                 + "Calling TperService.extendPersonalRetention()...");
 
-        boolean success = tperService.extendPersonalRetention(sessionId, guser, conversationId, yearsToKeep);
+        boolean success = tperService.extendPersonalRetention(sessionId, guser, conversationId);
 
         log.info("[" + sessionId + "] MainController.handleExtendRetention() - "
                 + "Service returned success=" + success + " for convId=" + conversationId);
 
         if (success) {
-            String msg = "Retention extended successfully for conversation " + conversationId
-                    + " (" + yearsToKeep + " years).";
+            String msg = "Retention extended successfully for conversation " + conversationId + ".";
             log.info("[" + sessionId + "] MainController.handleExtendRetention() - " + msg);
             request.setAttribute("retentionMsg", msg);
         } else {
@@ -486,8 +407,9 @@ public class MainController extends HttpServlet {
                 session.setAttribute("gui_user", dummyUser);
 
                 log.info("[" + sessionId + "] MainController.handleLogin() - "
-                        + "Dummy user stored in session. Redirecting to tperApp (searchCall default).");
-                request.getRequestDispatcher("/SearchCall.jsp").forward(request, response);
+                        + "Dummy user stored in session. Redirecting to searchCall action");
+                String redirectUrl = response.encodeRedirectURL("tperApp?action=searchCall");
+                response.sendRedirect(redirectUrl);
 
                 log.info("[" + sessionId + "] MainController.handleLogin() - EXIT (security disabled)");
                 return;
@@ -517,17 +439,24 @@ public class MainController extends HttpServlet {
             guser.getToken(false);
             log.info("[" + sessionId + "] MainController.handleLogin() - Access token obtained successfully.");
 
+            Genesys.fetchUserGroups(guser);
+            log.info("[" + sessionId + "] MainController.handleLogin() - "
+                    + "User groups fetched. count=" + guser.getUserGroups().size()
+                    + ", groups=" + guser.getUserGroups());
+
             session.setAttribute("guser", guser);
+            session.setAttribute("userGroups", guser.getUserGroups());
 
             log.info("[" + sessionId + "] MainController.handleLogin() - "
-                    + "GenesysUser stored in session. Redirecting to SearchCall.jsp");
-            request.getRequestDispatcher("/SearchCall.jsp").forward(request, response);
+                    + "GenesysUser stored in session. Redirecting to searchCall action");
+            String redirectUrl = response.encodeRedirectURL("tperApp?action=searchCall");
+            response.sendRedirect(redirectUrl);
 
         } catch (Exception e) {
             log.log(Level.SEVERE,
                     "[" + sessionId + "] MainController.handleLogin() - Authentication failed", e);
-            request.setAttribute("error", "Authentication failed. Please try again.");
-            request.getRequestDispatcher("/index.jsp").forward(request, response);
+            request.setAttribute("message", "Authentication failed. Please try again.");
+            request.getRequestDispatcher("/relogin.jsp").forward(request, response);
         }
 
         log.info("[" + sessionId + "] MainController.handleLogin() - EXIT");
@@ -541,17 +470,20 @@ public class MainController extends HttpServlet {
         HttpSession session = request.getSession(false);
         if (session != null) {
             log.info("[" + sessionId + "] MainController.handleLogout() - "
-                    + "Invalidating session for user logout.");
-            session.invalidate();
-            log.info("[" + sessionId + "] MainController.handleLogout() - Session invalidated successfully.");
+                    + "Superficial logout: removing local session attributes (Genesys token preserved).");
+            session.removeAttribute("guser");
+            session.removeAttribute("userGroups");
+            session.removeAttribute("gui_user");
+            log.info("[" + sessionId + "] MainController.handleLogout() - Local attributes removed.");
         } else {
             log.warning("[" + sessionId + "] MainController.handleLogout() - "
-                    + "No active session found to invalidate.");
+                    + "No active session found.");
         }
 
         log.info("[" + sessionId + "] MainController.handleLogout() - "
-                + "Redirecting to index.jsp. EXIT");
-        response.sendRedirect("index.jsp");
+                + "Redirecting to relogin.jsp. EXIT");
+        request.setAttribute("message", "You have been logged out successfully. Would you like to log in again?");
+        request.getRequestDispatcher("/relogin.jsp").forward(request, response);
     }
     private String convertToUtc(String localDateStr, String sessionId) {
         log.fine("[" + sessionId + "] MainController.convertToUtc() - ENTRY - localDateStr=" + localDateStr);

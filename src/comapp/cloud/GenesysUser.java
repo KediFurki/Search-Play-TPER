@@ -1,6 +1,8 @@
 package comapp.cloud;
 
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 //import java.util.logging.Level;
 //import java.util.logging.Logger;
 
@@ -33,6 +35,8 @@ public class GenesysUser  {
 	private String authorization;
 	public Object syncObjectUsers = new Object();
 
+	private List<String> userGroups = new ArrayList<>();
+
 
 
 	String routingstatusTableName = "routingstatus";
@@ -55,6 +59,14 @@ public class GenesysUser  {
 
 	public Object getSyncObjectUsers() {
 		return syncObjectUsers;
+	}
+
+	public List<String> getUserGroups() {
+		return userGroups;
+	}
+
+	public void setUserGroups(List<String> userGroups) {
+		this.userGroups = userGroups;
 	}
 
 	public void setCode(String code) {

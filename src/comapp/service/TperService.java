@@ -1,26 +1,33 @@
 package comapp.service;
 
 import java.io.InputStream;
+import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import comapp.ConfigServlet;
 import comapp.cloud.Genesys;
 import comapp.cloud.Genesys.AudioType;
 import comapp.cloud.GenesysUser;
+import comapp.db.AnalyzerRepository;
 
 public class TperService {
 
     private static final Logger log = Logger.getLogger("comapp");
 
     private final MorphingService morphingService = new MorphingService();
+    private final AnalyzerRepository analyzerRepository = new AnalyzerRepository();
 
-    public JSONObject searchCalls(String sessionId, GenesysUser guser,
-                                  String sStart, String sEnd,
-                                  String ani, String dnis,
-                                  int pageNumber, int pageSize, String order) {
+    public Map<String, Object> searchCalls(String sessionId, GenesysUser guser,
+                                                  String sStart, String sEnd,
+                                                  String ani, String dnis,
+                                                  String conversationId, String queue, String operator,
+                                                  List<String> userGroups, boolean enableGroupFilter,
+                                                  int pageNumber, int pageSize, String order) {
 
         log.info("[" + sessionId + "] TperService.searchCalls() - ENTRY - "
                 + "sessionId=" + sessionId
@@ -29,52 +36,51 @@ public class TperService {
                 + ", sEnd=" + sEnd
                 + ", ani=" + ani
                 + ", dnis=" + dnis
+                + ", conversationId=" + conversationId
+                + ", queue=" + queue
+                + ", operator=" + operator
+                + ", userGroups=" + userGroups
+                + ", enableGroupFilter=" + enableGroupFilter
                 + ", pageNumber=" + pageNumber
                 + ", pageSize=" + pageSize
                 + ", order=" + order);
 
-        JSONObject result = null;
-        StringBuffer details = new StringBuffer();
+        Map<String, Object> result = null;
 
         try {
-            log.info("[" + sessionId + "] TperService.searchCalls() - Sending request to Genesys.getConversationList...");
+            log.info("[" + sessionId + "] TperService.searchCalls() - Sending request to AnalyzerRepository.searchCallsInDatabase...");
 
-            result = Genesys.getConversationList(sessionId, guser, sStart, sEnd,
-                                                  ani, dnis, pageNumber, pageSize,
-                                                  order, details);
+            result = analyzerRepository.searchCallsInDatabase(
+                    sStart, sEnd, ani, dnis,
+                    conversationId, queue, operator,
+                    userGroups, enableGroupFilter,
+                    pageNumber, pageSize, order);
 
             if (result != null) {
-                int totalHits = result.optInt("totalHits", 0);
                 log.info("[" + sessionId + "] TperService.searchCalls() - Response received successfully. "
-                        + "totalHits=" + totalHits
-                        + ", details=" + details);
+                        + "totalCount=" + result.get("totalCount")
+                        + ", pageResults=" + ((List<?>) result.get("results")).size());
             } else {
-                log.warning("[" + sessionId + "] TperService.searchCalls() - Genesys returned null response. "
-                        + "details=" + details);
+                log.warning("[" + sessionId + "] TperService.searchCalls() - AnalyzerRepository returned null response.");
             }
 
         } catch (Exception e) {
             log.log(Level.SEVERE,
-                    "[" + sessionId + "] TperService.searchCalls() - Exception while calling Genesys.getConversationList", e);
+                    "[" + sessionId + "] TperService.searchCalls() - Exception while calling AnalyzerRepository.searchCallsInDatabase", e);
         }
 
         log.info("[" + sessionId + "] TperService.searchCalls() - EXIT - "
-                + "resultIsNull=" + (result == null)
-                + ", details=" + details);
+                + "resultIsNull=" + (result == null));
 
         return result;
     }
-
     public InputStream getMorphedAudioStream(String sessionId, GenesysUser guser,
                                              String conversationId) {
-
         log.info("[" + sessionId + "] TperService.getMorphedAudioStream() - ENTRY - "
                 + "sessionId=" + sessionId
                 + ", guser=" + guser
                 + ", conversationId=" + conversationId);
-
         InputStream morphedStream = null;
-
         try {
             log.info("[" + sessionId + "] TperService.getMorphedAudioStream() - "
                     + "Fetching recorder list from Genesys for conversationId=" + conversationId + "...");
@@ -130,13 +136,12 @@ public class TperService {
         return morphedStream;
     }
     public boolean extendPersonalRetention(String sessionId, GenesysUser guser,
-                                           String conversationId, int yearsToKeep) {
+                                           String conversationId) {
 
         log.info("[" + sessionId + "] TperService.extendPersonalRetention() - ENTRY - "
                 + "sessionId=" + sessionId
                 + ", guser=" + guser
-                + ", conversationId=" + conversationId
-                + ", yearsToKeep=" + yearsToKeep);
+                + ", conversationId=" + conversationId);
 
         boolean success = false;
 
@@ -146,6 +151,10 @@ public class TperService {
                         + "conversationId is null or blank. Aborting retention extension.");
                 return false;
             }
+
+            int yearsToKeep = Integer.parseInt(
+                    ConfigServlet.getProperties().getProperty("retention.years", "17"));
+            log.info("Retention süresi properties dosyasından okundu: " + yearsToKeep + " yıl");
 
             if (yearsToKeep <= 0) {
                 log.warning("[" + sessionId + "] TperService.extendPersonalRetention() - "
@@ -161,7 +170,6 @@ public class TperService {
             log.info("[" + sessionId + "] TperService.extendPersonalRetention() - "
                     + "Calculated retention period: " + retentionDays + " days"
                     + " (" + yearsToKeep + " years) for conversationId=" + conversationId);
-
             log.info("[" + sessionId + "] TperService.extendPersonalRetention() - "
                     + "Sending retention extension request to Genesys API: "
                     + "conversationId=" + conversationId
@@ -188,7 +196,6 @@ public class TperService {
 
         log.info("[" + sessionId + "] TperService.extendPersonalRetention() - EXIT - "
                 + "conversationId=" + conversationId
-                + ", yearsToKeep=" + yearsToKeep
                 + ", success=" + success);
 
         return success;
