@@ -61,9 +61,14 @@
             border: 1px #ccc solid !important;
             color: #CCC;
         }
+        #resizeMe {
+            border-collapse: collapse;
+            border: 1px solid #ddd;
+        }
+
         #resizeMe td {
             padding: 5px;
-            border-bottom: 1px #CCC solid;
+            border: 1px solid #e5e5e5;
             text-overflow: ellipsis;
             white-space: nowrap;
             overflow: hidden;
@@ -75,10 +80,9 @@
             vertical-align: middle;
             padding: 4px 8px;
             text-align: center;
-        }
-
-        .resizerTarget {
-            border: 0px;
+            border: 1px solid #ccc;
+            border-bottom: 2px solid #44444E;
+            background-color: #fafafa;
         }
         .bottom {
             position: fixed;
@@ -229,7 +233,7 @@
     <table id="resizeMe" class="uk-table uk-table-hover uk-table-divider" style="width: 100%; margin-bottom: 95px; margin-top: 10px;">
         <thead style="width: 100%; table-layout: fixed; position: sticky; top: 0; padding-bottom: 0px;">
             <tr>
-                <th class="resizerTarget" style="padding-bottom: 2px; padding-top: 4px; cursor: pointer; min-width: 70px; text-align: center;" onclick="toggleOrder()">
+                <th style="padding-bottom: 2px; padding-top: 4px; cursor: pointer; min-width: 70px; text-align: center;" onclick="toggleOrder()">
                     <nobr style="padding-right: 5px;">DATE
                     <c:choose>
                         <c:when test="${order == 'desc'}">
@@ -241,12 +245,12 @@
                     </c:choose>
                     </nobr>
                 </th>
-                <th class="resizerTarget" style="padding-bottom: 2px; padding-top: 4px; min-width: 70px; text-align: center;"><nobr>CONVERSATION ID</nobr></th>
-                <th class="resizerTarget" style="padding-bottom: 2px; padding-top: 4px; min-width: 70px; text-align: center;"><nobr>ANI</nobr></th>
-                <th class="resizerTarget" style="padding-bottom: 2px; padding-top: 4px; min-width: 70px; text-align: center;"><nobr>DNIS</nobr></th>
-                <th class="resizerTarget" style="padding-bottom: 2px; padding-top: 4px; min-width: 70px; text-align: center;"><nobr>QUEUE</nobr></th>
-                <th class="resizerTarget" style="padding-bottom: 2px; padding-top: 4px; min-width: 70px; text-align: center;"><nobr>OPERATOR</nobr></th>
-                <th class="resizerTarget" style="padding-bottom: 2px; padding-top: 4px; min-width: 70px; text-align: center;"><nobr>ACTIONS</nobr></th>
+                <th style="padding-bottom: 2px; padding-top: 4px; min-width: 70px; text-align: center;"><nobr>CONVERSATION ID</nobr></th>
+                <th style="padding-bottom: 2px; padding-top: 4px; min-width: 70px; text-align: center;"><nobr>ANI</nobr></th>
+                <th style="padding-bottom: 2px; padding-top: 4px; min-width: 70px; text-align: center;"><nobr>DNIS</nobr></th>
+                <th style="padding-bottom: 2px; padding-top: 4px; min-width: 70px; text-align: center;"><nobr>QUEUE</nobr></th>
+                <th style="padding-bottom: 2px; padding-top: 4px; min-width: 70px; text-align: center;"><nobr>OPERATOR</nobr></th>
+                <th style="padding-bottom: 2px; padding-top: 4px; min-width: 70px; text-align: center;"><nobr>ACTIONS</nobr></th>
             </tr>
         </thead>
         <tbody>

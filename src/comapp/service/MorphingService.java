@@ -81,7 +81,7 @@ public class MorphingService {
             log.info("MorphingService.processAudio() - Writing morphed audio to ByteArrayOutputStream...");
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             AudioSystem.write(voiceChanged, AudioFileFormat.Type.WAVE, baos);
-            
+
             byte[] resultBytes = baos.toByteArray();
             log.info("MorphingService.processAudio() - EXIT - Morphed WAV size=" + resultBytes.length + " bytes");
 
@@ -172,7 +172,7 @@ public class MorphingService {
             log.info("MorphingService.changeVoice() - Applying FFT forward...");
             DoubleFFT_1D fft = new DoubleFFT_1D(audioSamples.length);
             fft.realForward(audioSamples);
-
+            
             log.info("MorphingService.changeVoice() - Applying camouflageFrequencies (factor=" + camouflageFactor + ")...");
             camouflageFrequencies(audioSamples, camouflageFactor);
 
