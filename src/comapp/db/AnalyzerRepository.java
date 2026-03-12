@@ -58,25 +58,13 @@ public class AnalyzerRepository {
         boolean hasQueue          = (queue != null && !queue.isEmpty());
         boolean hasOperator       = (operator != null && !operator.isEmpty());
         boolean hasGroupFilter    = (enableGroupFilter && userGroups != null && !userGroups.isEmpty());
-        boolean needsParticipantJoin = hasAni || hasDnis || hasQueue || hasOperator || hasGroupFilter;
-
         List<String> countParams = new ArrayList<>();
         StringBuilder countSql = new StringBuilder();
 
-        if (!needsParticipantJoin) {
-            countSql.append("SELECT COUNT(*) AS total FROM conversations c WHERE 1=1 ");
-        } else {
-            countSql.append("SELECT COUNT(DISTINCT c.conversationid) AS total ");
-            countSql.append("FROM conversations c ");
-            countSql.append("JOIN participants p ON c.conversationid = p.conversationid ");
-            if (hasQueue || hasGroupFilter) {
-                countSql.append("LEFT JOIN conf_queue cq ON p.queueid = cq.id ");
-            }
-            if (hasOperator) {
-                countSql.append("LEFT JOIN conf_user cu ON p.userid = cu.id ");
-            }
-            countSql.append("WHERE 1=1 ");
-        }
+        countSql.append("SELECT COUNT(DISTINCT c.conversationid) AS total ");
+        countSql.append("FROM conversations c ");
+        countSql.append("WHERE 1=1 ");
+
         if (hasStartDate) {
             countSql.append("AND c.conversationstart >= ? ");
             countParams.add(startDate);
@@ -90,19 +78,19 @@ public class AnalyzerRepository {
             countParams.add(conversationId);
         }
         if (hasAni) {
-            countSql.append("AND p.ani ILIKE ? ");
+            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid WHERE p2.conversationid = c.conversationid AND s2.ani LIKE ?) ");
             countParams.add("%" + ani + "%");
         }
         if (hasDnis) {
-            countSql.append("AND p.dnis ILIKE ? ");
+            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid WHERE p2.conversationid = c.conversationid AND s2.dnis LIKE ?) ");
             countParams.add("%" + dnis + "%");
         }
         if (hasQueue) {
-            countSql.append("AND cq.name ILIKE ? ");
+            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid JOIN segments seg2 ON s2.sessionid = seg2.sessionid JOIN conf_queue cq2 ON seg2.queueid = cq2.id WHERE p2.conversationid = c.conversationid AND cq2.name LIKE ?) ");
             countParams.add("%" + queue + "%");
         }
         if (hasOperator) {
-            countSql.append("AND cu.name ILIKE ? ");
+            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN conf_user cu2 ON p2.userid = cu2.id WHERE p2.conversationid = c.conversationid AND cu2.name LIKE ?) ");
             countParams.add("%" + operator + "%");
         }
         if (hasGroupFilter) {
@@ -111,7 +99,7 @@ public class AnalyzerRepository {
                 if (i > 0) placeholders.append(", ");
                 placeholders.append("?");
             }
-            countSql.append("AND cq.name IN (").append(placeholders).append(") ");
+            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid JOIN segments seg2 ON s2.sessionid = seg2.sessionid JOIN conf_queue cq2 ON seg2.queueid = cq2.id WHERE p2.conversationid = c.conversationid AND cq2.name IN (").append(placeholders).append(")) ");
             countParams.addAll(userGroups);
         }
       log.info("COUNT SQL: " + countSql.toString());
@@ -122,17 +110,6 @@ public class AnalyzerRepository {
         dataSql.append("WITH PagedCalls AS ( ");
         dataSql.append("SELECT DISTINCT c.conversationid, c.conversationstart ");
         dataSql.append("FROM conversations c ");
-
-        if (needsParticipantJoin) {
-            dataSql.append("JOIN participants p ON c.conversationid = p.conversationid ");
-            if (hasQueue || hasGroupFilter) {
-                dataSql.append("LEFT JOIN conf_queue cq ON p.queueid = cq.id ");
-            }
-            if (hasOperator) {
-                dataSql.append("LEFT JOIN conf_user cu ON p.userid = cu.id ");
-            }
-        }
-
         dataSql.append("WHERE 1=1 ");
 
         if (hasStartDate) {
@@ -148,19 +125,19 @@ public class AnalyzerRepository {
             dataParams.add(conversationId);
         }
         if (hasAni) {
-            dataSql.append("AND p.ani ILIKE ? ");
+            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid WHERE p2.conversationid = c.conversationid AND s2.ani LIKE ?) ");
             dataParams.add("%" + ani + "%");
         }
         if (hasDnis) {
-            dataSql.append("AND p.dnis ILIKE ? ");
+            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid WHERE p2.conversationid = c.conversationid AND s2.dnis LIKE ?) ");
             dataParams.add("%" + dnis + "%");
         }
         if (hasQueue) {
-            dataSql.append("AND cq.name ILIKE ? ");
+            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid JOIN segments seg2 ON s2.sessionid = seg2.sessionid JOIN conf_queue cq2 ON seg2.queueid = cq2.id WHERE p2.conversationid = c.conversationid AND cq2.name LIKE ?) ");
             dataParams.add("%" + queue + "%");
         }
         if (hasOperator) {
-            dataSql.append("AND cu.name ILIKE ? ");
+            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN conf_user cu2 ON p2.userid = cu2.id WHERE p2.conversationid = c.conversationid AND cu2.name LIKE ?) ");
             dataParams.add("%" + operator + "%");
         }
         if (hasGroupFilter) {
@@ -169,7 +146,7 @@ public class AnalyzerRepository {
                 if (i > 0) placeholders.append(", ");
                 placeholders.append("?");
             }
-            dataSql.append("AND cq.name IN (").append(placeholders).append(") ");
+            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid JOIN segments seg2 ON s2.sessionid = seg2.sessionid JOIN conf_queue cq2 ON seg2.queueid = cq2.id WHERE p2.conversationid = c.conversationid AND cq2.name IN (").append(placeholders).append(")) ");
             dataParams.addAll(userGroups);
         }
 
@@ -177,13 +154,18 @@ public class AnalyzerRepository {
         dataSql.append("LIMIT ? OFFSET ? ");
         dataSql.append(") ");
         dataSql.append("SELECT paged.conversationid, paged.conversationstart, ");
-        dataSql.append("c.conversationend, p.ani, p.dnis, ");
-        dataSql.append("cq.name AS queue_name, cu.name AS operator_name ");
+        dataSql.append("MAX(c.conversationend) AS conversationend, ");
+        dataSql.append("MAX(s.ani) AS ani, MAX(s.dnis) AS dnis, ");
+        dataSql.append("STRING_AGG(DISTINCT cq.name, ', ') AS queue_name, ");
+        dataSql.append("STRING_AGG(DISTINCT cu.name, ', ') AS operator_name ");
         dataSql.append("FROM PagedCalls paged ");
         dataSql.append("JOIN conversations c ON paged.conversationid = c.conversationid ");
         dataSql.append("LEFT JOIN participants p ON c.conversationid = p.conversationid ");
-        dataSql.append("LEFT JOIN conf_queue cq ON p.queueid = cq.id ");
+        dataSql.append("LEFT JOIN sessions s ON p.participantid = s.participantid ");
+        dataSql.append("LEFT JOIN segments seg ON s.sessionid = seg.sessionid ");
+        dataSql.append("LEFT JOIN conf_queue cq ON seg.queueid = cq.id ");
         dataSql.append("LEFT JOIN conf_user cu ON p.userid = cu.id ");
+        dataSql.append("GROUP BY paged.conversationid, paged.conversationstart ");
         dataSql.append("ORDER BY paged.conversationstart ").append(orderDir);
         log.info("DATA SQL: " + dataSql.toString());
 
