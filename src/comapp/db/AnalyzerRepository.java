@@ -32,7 +32,7 @@ public class AnalyzerRepository {
             String conversationId, String queue, String operator,
             List<String> userGroups, boolean enableGroupFilter,
             int pageNumber, int pageSize, String order) {
-
+    		
         log.info("AnalyzerRepository.searchCallsInDatabase() - ENTRY - "
                 + "startDate=" + startDate
                 + ", endDate=" + endDate

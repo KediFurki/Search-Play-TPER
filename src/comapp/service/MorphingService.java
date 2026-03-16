@@ -38,7 +38,7 @@ public class MorphingService {
         int nSeconds = Integer.parseInt(cs.getProperty("secondToMuted", "0"));
         float pitchFactor = Float.parseFloat(cs.getProperty("pitchFactor", "0"));
         float camouflageFactor = Float.parseFloat(cs.getProperty("camouflageFactor", "0"));
-
+        
         log.info("MorphingService.processAudio() - Config loaded: "
                 + "secondToMuted=" + nSeconds
                 + ", pitchFactor=" + pitchFactor
