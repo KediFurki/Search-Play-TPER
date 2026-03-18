@@ -78,19 +78,19 @@ public class AnalyzerRepository {
             countParams.add(conversationId);
         }
         if (hasAni) {
-            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid WHERE p2.conversationid = c.conversationid AND s2.ani LIKE ?) ");
+            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid WHERE p2.conversationid = c.conversationid AND s2.ani ILIKE ?) ");
             countParams.add("%" + ani + "%");
         }
         if (hasDnis) {
-            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid WHERE p2.conversationid = c.conversationid AND s2.dnis LIKE ?) ");
+            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid WHERE p2.conversationid = c.conversationid AND s2.dnis ILIKE ?) ");
             countParams.add("%" + dnis + "%");
         }
         if (hasQueue) {
-            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid JOIN segments seg2 ON s2.sessionid = seg2.sessionid JOIN conf_queue cq2 ON seg2.queueid = cq2.id WHERE p2.conversationid = c.conversationid AND cq2.name LIKE ?) ");
+            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid JOIN segments seg2 ON s2.sessionid = seg2.sessionid JOIN conf_queue cq2 ON seg2.queueid = cq2.id WHERE p2.conversationid = c.conversationid AND cq2.name ILIKE ?) ");
             countParams.add("%" + queue + "%");
         }
         if (hasOperator) {
-            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN conf_user cu2 ON p2.userid = cu2.id WHERE p2.conversationid = c.conversationid AND cu2.name LIKE ?) ");
+            countSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN conf_user cu2 ON p2.userid = cu2.id WHERE p2.conversationid = c.conversationid AND cu2.name ILIKE ?) ");
             countParams.add("%" + operator + "%");
         }
         if (hasGroupFilter) {
@@ -125,19 +125,19 @@ public class AnalyzerRepository {
             dataParams.add(conversationId);
         }
         if (hasAni) {
-            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid WHERE p2.conversationid = c.conversationid AND s2.ani LIKE ?) ");
+            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid WHERE p2.conversationid = c.conversationid AND s2.ani ILIKE ?) ");
             dataParams.add("%" + ani + "%");
         }
         if (hasDnis) {
-            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid WHERE p2.conversationid = c.conversationid AND s2.dnis LIKE ?) ");
+            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid WHERE p2.conversationid = c.conversationid AND s2.dnis ILIKE ?) ");
             dataParams.add("%" + dnis + "%");
         }
         if (hasQueue) {
-            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid JOIN segments seg2 ON s2.sessionid = seg2.sessionid JOIN conf_queue cq2 ON seg2.queueid = cq2.id WHERE p2.conversationid = c.conversationid AND cq2.name LIKE ?) ");
+            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN sessions s2 ON p2.participantid = s2.participantid JOIN segments seg2 ON s2.sessionid = seg2.sessionid JOIN conf_queue cq2 ON seg2.queueid = cq2.id WHERE p2.conversationid = c.conversationid AND cq2.name ILIKE ?) ");
             dataParams.add("%" + queue + "%");
         }
         if (hasOperator) {
-            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN conf_user cu2 ON p2.userid = cu2.id WHERE p2.conversationid = c.conversationid AND cu2.name LIKE ?) ");
+            dataSql.append("AND EXISTS (SELECT 1 FROM participants p2 JOIN conf_user cu2 ON p2.userid = cu2.id WHERE p2.conversationid = c.conversationid AND cu2.name ILIKE ?) ");
             dataParams.add("%" + operator + "%");
         }
         if (hasGroupFilter) {

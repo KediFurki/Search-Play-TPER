@@ -341,7 +341,7 @@ public class MainController extends HttpServlet {
         if ("true".equalsIgnoreCase(lockState)) {
             log.info("[" + sessionId + "] MainController.handleToggleRetention() - "
                     + "lockState=true -> Extending retention (17 years) for conversationId=" + conversationId);
-            success = tperService.extendPersonalRetention(sessionId, guser, conversationId);
+            success = tperService.extendPersonalRetention(sessionId, guser, conversationId, convStart);
         } else {
             log.info("[" + sessionId + "] MainController.handleToggleRetention() - "
                     + "lockState=false -> Reverting retention (start+90 days) for conversationId=" + conversationId);

@@ -983,6 +983,25 @@ public class Genesys {
 
 	}
 
+	public static boolean updateRecordingRetention(GenesysUser guser, String conversationId, String recordingId, String deleteDate) {
+		try {
+			String urlString = prefixApi + guser.urlRegion + "/api/v2/conversations/" + conversationId + "/recordings/" + recordingId;
+			log.log(Level.INFO, "[" + guser.sessionId + ",updateRecordingRetention] urlString:" + urlString
+					+ " conversationId=" + conversationId + " recordingId=" + recordingId + " deleteDate=" + deleteDate);
+
+			JSONObject body = new JSONObject();
+			body.put("deleteDate", deleteDate);
+
+			StringEntity he = new StringEntity(body.toString(), "UTF-8");
+			return refinePerformRequestPut(guser, urlString, he, "application/json; charset=UTF-8", 0, "updateRecordingRetention") != null;
+		} catch (Exception e) {
+			log.log(Level.INFO, "[" + guser.sessionId + ",updateRecordingRetention] - conversationId=" + conversationId
+					+ " recordingId=" + recordingId, e);
+			return false;
+		} finally {
+		}
+	}
+
 	public static boolean createDatabaseRow(GenesysUser guser, String databaseId, JSONObject jo) {
 
 		try {

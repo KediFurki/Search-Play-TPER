@@ -478,7 +478,10 @@
         console.log('[toggleRetention] convId=' + convId
                    + ', currentlyLocked=' + currentlyLocked
                    + ', newLockState=' + newLockState);
+
         btn.disabled = true;
+        btn.style.opacity = '0.4';
+        btn.style.cursor = 'wait';
 
         var url = "<c:url value='tperApp'/>";
         var params = "action=toggleRetention"
@@ -493,8 +496,12 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
 
-                if (xhr.status === 200 && xhr.responseText === "success") {
+                var responseText = xhr.responseText ? xhr.responseText.trim() : "";
+
+                if (xhr.status === 200 && responseText === "success") {
                     console.log('[toggleRetention] Success. newLockState=' + newLockState);
 
                     btn.setAttribute('data-locked', String(newLockState));
@@ -504,14 +511,15 @@
                         btn.style.backgroundColor = '#44444E';
                         btn.style.color = '#fff';
                         btn.setAttribute('title', 'Locked: 17 Years (Click to Unlock)');
-                        UIkit.notification({message: 'Retention locked for 17 years.', status: 'success', pos: 'top-right', timeout: 3000});
+                        UIkit.notification({message: '<span uk-icon="icon: check"></span> Successfully extended to 17 years!', status: 'success', pos: 'top-center', timeout: 3000});
                     } else {
                         btn.setAttribute('uk-icon', 'icon: unlock');
                         btn.style.backgroundColor = 'transparent';
                         btn.style.color = '';
                         btn.setAttribute('title', 'Retention: 90 Days (Click to Lock for 17 Years)');
-                        UIkit.notification({message: 'Retention reverted to 90 days.', status: 'primary', pos: 'top-right', timeout: 3000});
+                        UIkit.notification({message: '<span uk-icon="icon: info"></span> Retention reverted to 90 days.', status: 'primary', pos: 'top-center', timeout: 3000});
                     }
+                    btn.innerHTML = '';
                     UIkit.icon(btn);
                     UIkit.tooltip(btn);
 
@@ -522,8 +530,8 @@
                             window.location.href = "<c:url value='tperApp?action=logout'/>";
                         });
                 } else {
-                    console.log('[toggleRetention] Error. status=' + xhr.status + ', response=' + xhr.responseText);
-                    UIkit.notification({message: 'Failed to toggle retention. Please try again.', status: 'danger', pos: 'top-right', timeout: 4000});
+                    console.log('[toggleRetention] Error. status=' + xhr.status + ', response=' + responseText);
+                    UIkit.notification({message: '<span uk-icon="icon: warning"></span> Operation failed! You may not have permission to perform this action.', status: 'danger', pos: 'top-center', timeout: 4000});
                 }
             }
         };
