@@ -40,9 +40,9 @@ public class TperService {
             }
 
             tperSystemUser = new comapp.cloud.GenesysUser("SYSTEM_" + sessionId, tperClientId, tperClientSecret, urlRegion, "", "");
-            tperSystemUser.setCode(null); // Robot (client_credentials) kimliğine zorla
+            tperSystemUser.setCode(null);
         }
-        tperSystemUser.getToken(false); // Token al veya süresi dolduysa otomatik yenile
+        tperSystemUser.getToken(false);
         return tperSystemUser;
     }
 

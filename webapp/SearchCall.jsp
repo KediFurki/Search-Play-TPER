@@ -289,15 +289,7 @@
     </table>
     </div>
 </div>
-<div id="audioPlayerModal" uk-modal="bg-close: true">
-    <div class="uk-modal-dialog uk-modal-body uk-text-center" style="border-radius: 6px;">
-        <button class="uk-modal-close-default" type="button" uk-close></button>
-        <h3 class="uk-modal-title" style="color: #44444E;">Audio Player</h3>
-        <audio id="audioPlayer" controls controlsList="nodownload" style="width:100%;">
-            Your browser does not support the audio element.
-        </audio>
-    </div>
-</div>
+
 <div id="loadingModal" uk-modal="bg-close: false; esc-close: false;">
     <div class="uk-modal-dialog uk-modal-body uk-text-center"
          style="width: fit-content; border-radius: 4px;">
@@ -310,6 +302,9 @@
         <h2 class="uk-modal-title" style="color: #44444E;">Please wait...</h2>
         <p>The audio file is being prepared...</p>
         <div uk-spinner="ratio: 2"></div>
+        <div class="uk-margin-top">
+            <button class="uk-button uk-button-danger" onclick="cancelAudioPreparation()">Cancel</button>
+        </div>
     </div>
 </div>
 <c:if test="${not empty conversations and totalHits > 0}">
@@ -335,8 +330,7 @@
                     </button>
                 </td>
                 <td style="border: 0px; text-align: center;">
-                    <audio controls preload="none" id="control" style="width: 100%;">
-                        <source id="_player" src="" type="audio/mpeg">
+                    <audio controls preload="auto" id="control" controlsList="nodownload" oncontextmenu="return false;" style="width: 100%;">
                     </audio>
                 </td>
                 <td style="border: 0px; text-align: right; white-space: nowrap;">
@@ -377,21 +371,36 @@
         var row = document.getElementById(rowId);
         if (row) row.classList.add("highlight");
 
-        var player = document.getElementById("audioPlayer");
+        var player = document.getElementById("control");
+        if (!player) {
+            UIkit.modal.alert('Audio player not available. Please perform a search first.');
+            return;
+        }
+
+        player.pause();
+        player.removeAttribute("src");
+        player.load();
+
+        player.setAttribute("data-current-conv", conversationId);
+
         UIkit.modal('#modal-attesa-audio').show();
 
         player.src = "<c:url value='tperApp'/>" + "?action=playAudio&convId=" +
                      encodeURIComponent(conversationId);
         player.load();
 
-        player.oncanplay = function() {
+        player.oncanplaythrough = function() {
+            player.oncanplaythrough = null;
+            player.onerror = null;
             UIkit.modal('#modal-attesa-audio').hide();
-            UIkit.modal("#audioPlayerModal").show();
+            player.play();
         };
 
         player.onerror = function() {
+            player.oncanplaythrough = null;
+            player.onerror = null;
             UIkit.modal('#modal-attesa-audio').hide();
-            UIkit.modal.alert('Error loading or processing audio.');
+            UIkit.notification({message: '<span uk-icon="icon: warning"></span> Error loading audio. The recording may not be available.', status: 'danger', pos: 'top-center', timeout: 4000});
         };
     }
     function goToPage(page) {
@@ -537,6 +546,29 @@
         };
 
         xhr.send(params);
+    }
+    function cancelAudioPreparation() {
+        if (typeof currentAudioXhr !== 'undefined' && currentAudioXhr != null) {
+            currentAudioXhr.abort();
+            currentAudioXhr = null;
+        }
+        var player = document.getElementById("control");
+        var currentConvId = player ? player.getAttribute("data-current-conv") : null;
+        if (currentConvId) {
+            var cancelXhr = new XMLHttpRequest();
+            cancelXhr.open("POST", "<c:url value='tperApp'/>", true);
+            cancelXhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            cancelXhr.send("action=cancelAudio&convId=" + encodeURIComponent(currentConvId));
+        }
+        if (player) {
+            player.pause();
+            player.removeAttribute("src");
+            player.load();
+            player.oncanplaythrough = null;
+            player.onerror = null;
+        }
+        UIkit.modal('#modal-attesa-audio').hide();
+        UIkit.notification({message: 'Operation cancelled successfully.', status: 'warning', pos: 'top-center', timeout: 2000});
     }
 </script>
 </body>

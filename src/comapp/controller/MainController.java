@@ -71,6 +71,9 @@ public class MainController extends HttpServlet {
                 case "toggleRetention":
                     handleToggleRetention(request, response, session, sessionId);
                     break;
+                case "cancelAudio":
+                    handleCancelAudio(request, response, session, sessionId);
+                    break;
                 case "login":
                     handleLogin(request, response, sessionId);
                     break;
@@ -259,38 +262,62 @@ public class MainController extends HttpServlet {
             response.sendError(HttpServletResponse.SC_NOT_FOUND, "Audio not available for the requested conversation.");
             return;
         }
-        response.setContentType("audio/wav");
-        response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-        response.setHeader("Pragma", "no-cache");
-        response.setHeader("Content-Disposition", "inline");
+
+        byte[] audioData;
+        try (InputStream in = audioStream) {
+            audioData = in.readAllBytes();
+        }
 
         log.info("[" + sessionId + "] MainController.handlePlayAudio() - "
-                + "Streaming morphed audio to response for convId=" + conversationId);
+                + "Audio data loaded into memory. totalBytes=" + audioData.length
+                + ", convId=" + conversationId);
 
-        try (InputStream in = audioStream;
-             OutputStream out = response.getOutputStream()) {
+        String rangeHeader = request.getHeader("Range");
+        int totalLength = audioData.length;
 
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            long totalBytes = 0;
+        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+            String rangeValue = rangeHeader.substring("bytes=".length());
+            String[] parts = rangeValue.split("-");
+            int start = Integer.parseInt(parts[0]);
+            int end = (parts.length > 1 && !parts[1].isEmpty())
+                    ? Integer.parseInt(parts[1])
+                    : totalLength - 1;
 
-            while ((bytesRead = in.read(buffer)) != -1) {
-                out.write(buffer, 0, bytesRead);
-                totalBytes += bytesRead;
+            if (start >= totalLength) {
+                response.setStatus(416);
+                response.setHeader("Content-Range", "bytes */" + totalLength);
+                return;
             }
-            out.flush();
+            if (end >= totalLength) {
+                end = totalLength - 1;
+            }
 
+            int contentLength = end - start + 1;
+            response.setStatus(206);
+            response.setContentType("audio/wav");
+            response.setHeader("Content-Range", "bytes " + start + "-" + end + "/" + totalLength);
+            response.setContentLength(contentLength);
+            response.setHeader("Accept-Ranges", "bytes");
+            response.setHeader("Content-Disposition", "inline");
             log.info("[" + sessionId + "] MainController.handlePlayAudio() - "
-                    + "Streaming completed. totalBytesWritten=" + totalBytes
+                    + "Range request: bytes " + start + "-" + end + "/" + totalLength
                     + ", convId=" + conversationId);
 
-        } catch (IOException e) {
-            log.log(Level.SEVERE,
-                    "[" + sessionId + "] MainController.handlePlayAudio() - "
-                    + "IO error while streaming audio for convId=" + conversationId, e);
-            if (!response.isCommitted()) {
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                        "Error streaming audio data.");
+            try (OutputStream out = response.getOutputStream()) {
+                out.write(audioData, start, contentLength);
+                out.flush();
+            }
+        } else {
+            response.setContentType("audio/wav");
+            response.setContentLength(totalLength);
+            response.setHeader("Accept-Ranges", "bytes");
+            response.setHeader("Content-Disposition", "inline");
+            log.info("[" + sessionId + "] MainController.handlePlayAudio() - "
+                    + "Full response: " + totalLength + " bytes, convId=" + conversationId);
+
+            try (OutputStream out = response.getOutputStream()) {
+                out.write(audioData);
+                out.flush();
             }
         }
 
@@ -299,9 +326,7 @@ public class MainController extends HttpServlet {
     private void handleToggleRetention(HttpServletRequest request, HttpServletResponse response,
                                        HttpSession session, String sessionId)
             throws ServletException, IOException {
-
         log.info("[" + sessionId + "] MainController.handleToggleRetention() - ENTRY");
-
         response.setContentType("text/plain");
         response.setCharacterEncoding("UTF-8");
 
@@ -323,7 +348,6 @@ public class MainController extends HttpServlet {
         String conversationId = request.getParameter("conversationId");
         String convStart      = request.getParameter("convStart");
         String lockState      = request.getParameter("lockState");
-
         log.info("[" + sessionId + "] MainController.handleToggleRetention() - "
                 + "Parameters: conversationId=" + conversationId
                 + ", convStart=" + convStart
@@ -363,16 +387,24 @@ public class MainController extends HttpServlet {
         log.info("[" + sessionId + "] MainController.handleToggleRetention() - EXIT");
     }
 
+    private void handleCancelAudio(HttpServletRequest request, HttpServletResponse response,
+                                   HttpSession session, String sessionId) throws IOException {
+        String convId = request.getParameter("convId");
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(convId)) {
+            comapp.cloud.Genesys.cancelMap.put(convId, true);
+            log.info("[" + sessionId + "] - Cancel signal received for convId: " + convId);
+        }
+        response.getWriter().write("cancelled");
+    }
+
     private void handleLogin(HttpServletRequest request, HttpServletResponse response,
                              String sessionId)
             throws ServletException, IOException {
-
         log.info("[" + sessionId + "] MainController.handleLogin() - ENTRY");
 
         String username = StringUtils.defaultString(request.getParameter("username"), "");
         String password = request.getParameter("password") != null ? "***" : "null";
         String code     = StringUtils.defaultString(request.getParameter("code"), "");
-
         log.info("[" + sessionId + "] MainController.handleLogin() - Parameters: "
                 + "username=" + username
                 + ", password=" + password
@@ -501,12 +533,10 @@ public class MainController extends HttpServlet {
         try {
             DateTimeFormatter localFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
             DateTimeFormatter utcFormatter   = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
-
             LocalDateTime localDateTime      = LocalDateTime.parse(localDateStr, localFormatter);
             ZonedDateTime localZonedDateTime  = localDateTime.atZone(ZoneId.of("Europe/Rome"));
             ZonedDateTime utcDateTime         = localZonedDateTime.withZoneSameInstant(ZoneId.of("UTC"));
             String result = utcDateTime.format(utcFormatter);
-
             log.fine("[" + sessionId + "] MainController.convertToUtc() - EXIT - result=" + result);
             return result;
 

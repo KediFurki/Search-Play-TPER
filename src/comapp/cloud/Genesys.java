@@ -50,6 +50,7 @@ import comapp.ConfigServlet;
 
 public class Genesys {
 	static Logger log = Logger.getLogger("comapp");
+	public static java.util.concurrent.ConcurrentHashMap<String, Boolean> cancelMap = new java.util.concurrent.ConcurrentHashMap<>();
 	public static String version = "1.0.6";
 	public static String prefixLogin = "https://login.";
 	public static String prefixApi = "https://api.";
@@ -302,6 +303,10 @@ public class Genesys {
 					jsonString = (JSONObject) refinePerformRequestGet(guser, urlString, 0, id);
 					retry = false;
 				} catch (GenesysCloud202Exception e) {
+					if (e.jRes != null && e.jRes.optString("jsonString", "").contains("\"fileState\":\"DELETED\"")) {
+						log.log(Level.WARNING, "[" + guser.sessionId + "," + id + "] - fileState is DELETED. Breaking retry loop.");
+						return false;
+					}
 					log.log(Level.INFO, "[" + guser.sessionId + "," + id + "] - response is 202 sleep for retry");
 					retry = true;
 					Thread.sleep(2000);
@@ -2510,12 +2515,29 @@ public class Genesys {
 
 			JSONObject jsonString = null;
 			boolean retry = true;
+			int retryCount = 0;
+			int maxRetries = 15;
 			while (retry) {
+				String convIdForCancel = jo.optString("conversationId", id);
+				if (cancelMap.getOrDefault(convIdForCancel, false)) {
+					log.log(Level.INFO, "[" + guser.sessionId + "," + id + "] - Audio preparation cancelled by user. Breaking loop.");
+					cancelMap.remove(convIdForCancel);
+					return null;
+				}
+				if (retryCount >= maxRetries) {
+					log.log(Level.WARNING, "[" + guser.sessionId + "," + id + "] - Max retry limit (" + maxRetries + ") reached. Breaking loop.");
+					return null;
+				}
+				retryCount++;
 				try {
 					jsonString = (JSONObject) refinePerformRequestGet(guser, urlString, 0, id);
 					retry = false;
 				} catch (GenesysCloud202Exception e) {
-					log.log(Level.INFO, "[" + guser.sessionId + "," + id + "] - response is 202 sleep for retry");
+					if (e.jRes != null && e.jRes.optString("jsonString", "").contains("\"fileState\":\"DELETED\"")) {
+						log.log(Level.WARNING, "[" + guser.sessionId + "," + id + "] - fileState is DELETED. Breaking retry loop.");
+						return null;
+					}
+					log.log(Level.INFO, "[" + guser.sessionId + "," + id + "] - response is 202 sleep for retry (" + retryCount + "/" + maxRetries + ")");
 					retry = true;
 					Thread.sleep(2000);
 
