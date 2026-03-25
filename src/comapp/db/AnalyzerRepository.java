@@ -7,23 +7,16 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import comapp.ConfigServlet;
 
 public class AnalyzerRepository {
 
     private static final Logger log = Logger.getLogger("comapp");
 
     private Connection getConnection() throws Exception {
-        Properties props = ConfigServlet.getProperties();
-        String url = props.getProperty("db.url");
-        String user = props.getProperty("db.user");
-        String pwd = props.getProperty("db.pwd");
-        Class.forName("org.postgresql.Driver");
-        return java.sql.DriverManager.getConnection(url, user, pwd);
+        log.fine("AnalyzerRepository.getConnection() - Requesting pooled connection from Db...");
+        return Db.open();
     }
 
     public Map<String, Object> searchCallsInDatabase(
@@ -31,8 +24,7 @@ public class AnalyzerRepository {
             String ani, String dnis,
             String conversationId, String queue, String operator,
             List<String> userGroups, boolean enableGroupFilter,
-            int pageNumber, int pageSize, String order) {
-    		
+            int pageNumber, int pageSize, String order) {  		
         log.info("AnalyzerRepository.searchCallsInDatabase() - ENTRY - "
                 + "startDate=" + startDate
                 + ", endDate=" + endDate
@@ -46,10 +38,8 @@ public class AnalyzerRepository {
                 + ", pageNumber=" + pageNumber
                 + ", pageSize=" + pageSize
                 + ", order=" + order);
-
         List<Map<String, String>> results = new ArrayList<>();
         int totalCount = 0;
-
         boolean hasStartDate      = (startDate != null && !startDate.isEmpty());
         boolean hasEndDate        = (endDate != null && !endDate.isEmpty());
         boolean hasConversationId = (conversationId != null && !conversationId.isEmpty());

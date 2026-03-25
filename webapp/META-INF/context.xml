@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Context>
+    <!--
+        SP_Lite JNDI DataSource — Tomcat connection pooling.
+        These are default values for development.
+        For production, override in Tomcat's server-level context.xml
+        or in $CATALINA_BASE/conf/Catalina/localhost/SP_Lite.xml
+    -->
+    <Resource name="jdbc/SP_Lite"
+              auth="Container"
+              type="javax.sql.DataSource"
+              driverClassName="org.postgresql.Driver"
+              url="jdbc:postgresql://localhost:5432/analyzer"
+              username="postgres"
+              password="Kedi345"
+              maxTotal="20"
+              maxIdle="10"
+              minIdle="2"
+              maxWaitMillis="10000"
+              testOnBorrow="true"
+              validationQuery="SELECT 1"
+              removeAbandonedOnBorrow="true"
+              removeAbandonedTimeout="60"
+              logAbandoned="true" />
+</Context>

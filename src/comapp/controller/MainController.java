@@ -1,8 +1,11 @@
 package comapp.controller;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
+import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -11,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -227,7 +231,6 @@ public class MainController extends HttpServlet {
     private void handlePlayAudio(HttpServletRequest request, HttpServletResponse response,
                                  HttpSession session, String sessionId)
             throws ServletException, IOException {
-
         log.info("[" + sessionId + "] MainController.handlePlayAudio() - ENTRY");
 
         if (session == null) {
@@ -250,40 +253,92 @@ public class MainController extends HttpServlet {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Missing required parameter: convId");
             return;
         }
+        File audioFile = getOrCreateAudioTempFile(session, sessionId, guser, conversationId);
 
-        log.info("[" + sessionId + "] MainController.handlePlayAudio() - "
-                + "Requesting morphed audio stream from TperService for convId=" + conversationId);
-
-        InputStream audioStream = tperService.getMorphedAudioStream(sessionId, guser, conversationId);
-
-        if (audioStream == null) {
+        if (audioFile == null || !audioFile.exists()) {
             log.warning("[" + sessionId + "] MainController.handlePlayAudio() - "
-                    + "TperService returned null stream for convId=" + conversationId + ". Returning 404.");
+                    + "Audio temp file not available for convId=" + conversationId + ". Returning 404.");
             response.sendError(HttpServletResponse.SC_NOT_FOUND, "Audio not available for the requested conversation.");
             return;
         }
+        serveAudioFromFile(audioFile, request, response, sessionId, conversationId);
 
-        byte[] audioData;
-        try (InputStream in = audioStream) {
-            audioData = in.readAllBytes();
+        log.info("[" + sessionId + "] MainController.handlePlayAudio() - EXIT - convId=" + conversationId);
+    }
+
+    @SuppressWarnings("unchecked")
+    private File getOrCreateAudioTempFile(HttpSession session, String sessionId,
+                                          GenesysUser guser, String conversationId) {
+        ConcurrentHashMap<String, File> audioCache =
+                (ConcurrentHashMap<String, File>) session.getAttribute("audioCache");
+        if (audioCache == null) {
+            synchronized (session) {
+                audioCache = (ConcurrentHashMap<String, File>) session.getAttribute("audioCache");
+                if (audioCache == null) {
+                    audioCache = new ConcurrentHashMap<>();
+                    session.setAttribute("audioCache", audioCache);
+                    log.info("[" + sessionId + "] getOrCreateAudioTempFile() - Created new audioCache for session.");
+                }
+            }
+        }
+        File cached = audioCache.get(conversationId);
+        if (cached != null && cached.exists()) {
+            log.info("[" + sessionId + "] getOrCreateAudioTempFile() - Cache HIT for convId=" + conversationId
+                    + ", tempFile=" + cached.getAbsolutePath() + ", size=" + cached.length() + " bytes");
+            return cached;
+        }
+        log.info("[" + sessionId + "] getOrCreateAudioTempFile() - Cache MISS for convId=" + conversationId
+                + ". Requesting morphed audio from TperService...");
+
+        InputStream audioStream = tperService.getMorphedAudioStream(sessionId, guser, conversationId);
+        if (audioStream == null) {
+            log.warning("[" + sessionId + "] getOrCreateAudioTempFile() - TperService returned null stream for convId=" + conversationId);
+            return null;
         }
 
-        log.info("[" + sessionId + "] MainController.handlePlayAudio() - "
-                + "Audio data loaded into memory. totalBytes=" + audioData.length
-                + ", convId=" + conversationId);
+        File tempFile = null;
+        try {
+            tempFile = File.createTempFile("sp_audio_" + conversationId + "_", ".wav");
+            tempFile.deleteOnExit();
 
+            long bytesCopied;
+            try (InputStream in = audioStream;
+                 OutputStream out = Files.newOutputStream(tempFile.toPath())) {
+                bytesCopied = in.transferTo(out);
+            }
+
+            log.info("[" + sessionId + "] getOrCreateAudioTempFile() - Audio written to temp file: "
+                    + tempFile.getAbsolutePath() + ", size=" + bytesCopied + " bytes, convId=" + conversationId);
+
+            audioCache.put(conversationId, tempFile);
+            return tempFile;
+
+        } catch (IOException e) {
+            log.log(Level.SEVERE, "[" + sessionId + "] getOrCreateAudioTempFile() - "
+                    + "Failed to write audio to temp file for convId=" + conversationId, e);
+            if (tempFile != null && tempFile.exists()) {
+                tempFile.delete();
+            }
+            return null;
+        }
+    }
+    private void serveAudioFromFile(File audioFile, HttpServletRequest request,
+                                     HttpServletResponse response, String sessionId,
+                                     String conversationId) throws IOException {
+        long totalLength = audioFile.length();
         String rangeHeader = request.getHeader("Range");
-        int totalLength = audioData.length;
 
         if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
             String rangeValue = rangeHeader.substring("bytes=".length());
             String[] parts = rangeValue.split("-");
-            int start = Integer.parseInt(parts[0]);
-            int end = (parts.length > 1 && !parts[1].isEmpty())
-                    ? Integer.parseInt(parts[1])
+            long start = Long.parseLong(parts[0]);
+            long end = (parts.length > 1 && !parts[1].isEmpty())
+                    ? Long.parseLong(parts[1])
                     : totalLength - 1;
 
             if (start >= totalLength) {
+                log.warning("[" + sessionId + "] serveAudioFromFile() - Range start (" + start
+                        + ") >= totalLength (" + totalLength + "). Returning 416. convId=" + conversationId);
                 response.setStatus(416);
                 response.setHeader("Content-Range", "bytes */" + totalLength);
                 return;
@@ -292,36 +347,50 @@ public class MainController extends HttpServlet {
                 end = totalLength - 1;
             }
 
-            int contentLength = end - start + 1;
+            long contentLength = end - start + 1;
             response.setStatus(206);
             response.setContentType("audio/wav");
             response.setHeader("Content-Range", "bytes " + start + "-" + end + "/" + totalLength);
-            response.setContentLength(contentLength);
+            response.setHeader("Content-Length", String.valueOf(contentLength));
             response.setHeader("Accept-Ranges", "bytes");
             response.setHeader("Content-Disposition", "inline");
-            log.info("[" + sessionId + "] MainController.handlePlayAudio() - "
-                    + "Range request: bytes " + start + "-" + end + "/" + totalLength
-                    + ", convId=" + conversationId);
 
-            try (OutputStream out = response.getOutputStream()) {
-                out.write(audioData, start, contentLength);
+            log.info("[" + sessionId + "] serveAudioFromFile() - Range request: bytes " + start + "-" + end
+                    + "/" + totalLength + ", contentLength=" + contentLength + ", convId=" + conversationId);
+
+            try (RandomAccessFile raf = new RandomAccessFile(audioFile, "r");
+                 OutputStream out = response.getOutputStream()) {
+                raf.seek(start);
+                byte[] buffer = new byte[8192];
+                long remaining = contentLength;
+                while (remaining > 0) {
+                    int toRead = (int) Math.min(buffer.length, remaining);
+                    int bytesRead = raf.read(buffer, 0, toRead);
+                    if (bytesRead == -1) break;
+                    out.write(buffer, 0, bytesRead);
+                    remaining -= bytesRead;
+                }
                 out.flush();
             }
         } else {
             response.setContentType("audio/wav");
-            response.setContentLength(totalLength);
+            response.setHeader("Content-Length", String.valueOf(totalLength));
             response.setHeader("Accept-Ranges", "bytes");
             response.setHeader("Content-Disposition", "inline");
-            log.info("[" + sessionId + "] MainController.handlePlayAudio() - "
-                    + "Full response: " + totalLength + " bytes, convId=" + conversationId);
 
-            try (OutputStream out = response.getOutputStream()) {
-                out.write(audioData);
+            log.info("[" + sessionId + "] serveAudioFromFile() - Full response: "
+                    + totalLength + " bytes, convId=" + conversationId);
+
+            try (InputStream in = Files.newInputStream(audioFile.toPath());
+                 OutputStream out = response.getOutputStream()) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                }
                 out.flush();
             }
         }
-
-        log.info("[" + sessionId + "] MainController.handlePlayAudio() - EXIT - convId=" + conversationId);
     }
     private void handleToggleRetention(HttpServletRequest request, HttpServletResponse response,
                                        HttpSession session, String sessionId)
@@ -506,11 +575,14 @@ public class MainController extends HttpServlet {
 
         HttpSession session = request.getSession(false);
         if (session != null) {
+            cleanupAudioCache(session, sessionId);
+
             log.info("[" + sessionId + "] MainController.handleLogout() - "
                     + "Superficial logout: removing local session attributes (Genesys token preserved).");
             session.removeAttribute("guser");
             session.removeAttribute("userGroups");
             session.removeAttribute("gui_user");
+            session.removeAttribute("audioCache");
             log.info("[" + sessionId + "] MainController.handleLogout() - Local attributes removed.");
         } else {
             log.warning("[" + sessionId + "] MainController.handleLogout() - "
@@ -521,6 +593,34 @@ public class MainController extends HttpServlet {
                 + "Redirecting to relogin.jsp. EXIT");
         request.setAttribute("message", "You have been logged out successfully. Would you like to log in again?");
         request.getRequestDispatcher("/relogin.jsp").forward(request, response);
+    }
+    @SuppressWarnings("unchecked")
+    private void cleanupAudioCache(HttpSession session, String sessionId) {
+        ConcurrentHashMap<String, File> audioCache =
+                (ConcurrentHashMap<String, File>) session.getAttribute("audioCache");
+        if (audioCache == null || audioCache.isEmpty()) {
+            log.info("[" + sessionId + "] cleanupAudioCache() - No audio cache to clean up.");
+            return;
+        }
+
+        int deleted = 0;
+        int failed = 0;
+        for (Map.Entry<String, File> entry : audioCache.entrySet()) {
+            File tempFile = entry.getValue();
+            if (tempFile != null && tempFile.exists()) {
+                if (tempFile.delete()) {
+                    deleted++;
+                    log.fine("[" + sessionId + "] cleanupAudioCache() - Deleted temp file: "
+                            + tempFile.getAbsolutePath() + " (convId=" + entry.getKey() + ")");
+                } else {
+                    failed++;
+                    log.warning("[" + sessionId + "] cleanupAudioCache() - Failed to delete temp file: "
+                            + tempFile.getAbsolutePath() + " (convId=" + entry.getKey() + ")");
+                }
+            }
+        }
+        audioCache.clear();
+        log.info("[" + sessionId + "] cleanupAudioCache() - Cleanup complete. deleted=" + deleted + ", failed=" + failed);
     }
     private String convertToUtc(String localDateStr, String sessionId) {
         log.fine("[" + sessionId + "] MainController.convertToUtc() - ENTRY - localDateStr=" + localDateStr);

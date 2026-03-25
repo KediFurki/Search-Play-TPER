@@ -341,9 +341,7 @@
                         <button class="uk-button uk-button-default uk-button-small"
                                 onclick="goToPage(${currentpage - 1})"
                                 ${currentpage == 1 ? 'disabled' : ''}>Previous</button>
-
                         <span id="pageButtons"></span>
-
                         <button class="uk-button uk-button-default uk-button-small"
                                 onclick="goToPage(${currentpage + 1})"
                                 ${currentpage >= totalPages ? 'disabled' : ''}>Next</button>

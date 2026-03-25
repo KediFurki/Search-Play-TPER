@@ -155,7 +155,6 @@ public class TperService {
     }
     public boolean extendPersonalRetention(String sessionId, GenesysUser guser,
                                            String conversationId, String conversationStart) {
-
         log.info("[" + sessionId + "] TperService.extendPersonalRetention() - ENTRY - "
                 + "sessionId=" + sessionId
                 + ", guser=" + guser
@@ -193,12 +192,10 @@ public class TperService {
                     DateTimeFormatter.ISO_DATE_TIME.withZone(ZoneOffset.UTC));
             ZonedDateTime retentionDate = startDate.plusYears(yearsToKeep);
             String deleteDate = retentionDate.format(DateTimeFormatter.ISO_INSTANT);
-
             log.info("[" + sessionId + "] TperService.extendPersonalRetention() - "
                     + "Calculated deleteDate=" + deleteDate
                     + " (" + yearsToKeep + " years from conversationStart=" + conversationStart + ")"
                     + " for conversationId=" + conversationId);
-
             log.info("[" + sessionId + "] TperService.extendPersonalRetention() - "
                     + "Fetching recordings from Genesys API for conversationId=" + conversationId + "...");
 
@@ -206,7 +203,6 @@ public class TperService {
             if (recordings == null || recordings.length() == 0) {
                 throw new Exception("No recordings found for conversation " + conversationId);
             }
-
             log.info("[" + sessionId + "] TperService.extendPersonalRetention() - "
                     + "Found " + recordings.length() + " recording(s). Updating retention for each...");
 
@@ -234,7 +230,6 @@ public class TperService {
                 + ", success=" + success);
         return success;
     }
-
     public boolean revertPersonalRetention(String sessionId, GenesysUser guser,
                                            String conversationId, String conversationStart) {
         log.info("[" + sessionId + "] TperService.revertPersonalRetention() - ENTRY - "

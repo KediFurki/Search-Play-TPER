@@ -208,17 +208,14 @@ public class MorphingService {
         }
         int sampleSize = format.getSampleSizeInBits() / 8;
         int totalSamples = audioData.length / sampleSize;
-        // Output array same size as input — duration is preserved
         byte[] newAudioData = new byte[audioData.length];
 
         for (int i = 0; i < totalSamples; i++) {
-            // Map output sample i to a (fractional) source position
             double srcPos = i * pitchFactor;
             int srcIndex = (int) srcPos;
             double frac = srcPos - srcIndex;
 
             if (srcIndex + 1 < totalSamples) {
-                // Linear interpolation between two neighbouring samples for smooth output
                 for (int j = 0; j < sampleSize; j++) {
                     int s0 = audioData[srcIndex * sampleSize + j];
                     int s1 = audioData[(srcIndex + 1) * sampleSize + j];
@@ -229,7 +226,6 @@ public class MorphingService {
                     newAudioData[i * sampleSize + j] = audioData[srcIndex * sampleSize + j];
                 }
             }
-            // else: remains zero (silence) — only for tail samples beyond source range
         }
         return newAudioData;
     }
@@ -264,18 +260,14 @@ public class MorphingService {
         return audioSamples;
     }
     static void camouflageFrequencies(double[] audioSamples, double factor) {
-        // Only modify the speech formant range (300-3400 Hz) to preserve naturalness.
-        // Frequencies below 300 Hz (fundamental pitch) and above 3400 Hz are left untouched.
-        // FFT bin index = frequency * N / sampleRate  (assuming 8000 Hz sample rate)
         float sampleRate = 8000.0f;
         int n = audioSamples.length;
-        int binLow  = (int) (300.0  * n / sampleRate);  // ~300 Hz start
-        int binHigh = (int) (3400.0 * n / sampleRate);   // ~3400 Hz end
+        int binLow  = (int) (300.0  * n / sampleRate);
+        int binHigh = (int) (3400.0 * n / sampleRate);
         int halfN = n / 2;
 
         for (int i = binLow; i <= Math.min(binHigh, halfN); i++) {
             audioSamples[i] *= factor;
-            // Mirror: symmetric FFT component
             if (n - i < n) {
                 audioSamples[n - i] *= factor;
             }
