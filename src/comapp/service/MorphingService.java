@@ -208,8 +208,6 @@ public class MorphingService {
         }
         int sampleSize = format.getSampleSizeInBits() / 8;
         int totalSamples = audioData.length / sampleSize;
-
-        // Sesin uzayıp kısalmasına göre yeni toplam sample sayısını ve dizi boyutunu hesapla
         int newTotalSamples = (int) (totalSamples / pitchFactor);
         byte[] newAudioData = new byte[newTotalSamples * sampleSize];
 
