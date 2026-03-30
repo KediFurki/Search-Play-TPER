@@ -63,7 +63,12 @@ public class ConfigServlet extends HttpServlet {
 			log = Logger.getLogger("comapp");
 			
 			
-			log.info("************** Start: " + web_app + " " + version + " *******************");
+			log.info("\n"
+					+ "  ╔══════════════════════════════════════════════╗\n"
+					+ "  ║         SP_Lite  v" + version + "                    ║\n"
+					+ "  ║         STATUS : STARTING                    ║\n"
+					+ "  ╚══════════════════════════════════════════════╝\n"
+					+ "  config : " + ConfigLocation);
 			
 							
 		} catch (Exception e) {
@@ -73,7 +78,17 @@ public class ConfigServlet extends HttpServlet {
 			e.printStackTrace();
 		}
 		super.init(config);
-	}	
+	}
+
+	@Override
+	public void destroy() {
+		log.info("\n"
+				+ "  ╔══════════════════════════════════════════════╗\n"
+				+ "  ║         SP_Lite  v" + version + "                    ║\n"
+				+ "  ║         STATUS : STOPPED                     ║\n"
+				+ "  ╚══════════════════════════════════════════════╝");
+		super.destroy();
+	}
 
 	public static Properties getProperties() {
 		try {

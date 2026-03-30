@@ -30,10 +30,7 @@ public class ElabServlet extends HttpServlet implements Servlet {
 
 	public void init() throws ServletException {
 		try {
-			log.info("\n"+
-					 "\n================================================="+
-					 "\n    Start: Elab ServLet"+
-					 "\n=================================================");
+			log.info("[ELAB] Scheduler started | daily run at " + TimingStartAt);
 
 			elab = new Elab(this);
 			scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -58,8 +55,7 @@ public class ElabServlet extends HttpServlet implements Servlet {
 	    		Thread.currentThread().interrupt();
 	    	}
 	    }
-	    log.info("END-> ScheduledExecutorService shutdown initiated.");
-		log.log(Level.SEVERE, "END-> Stop scheduler - all resources released.");
+	    log.info("[ELAB] Scheduler stopped | all resources released.");
 	}
 		
 	private long millisToStartDay() {
