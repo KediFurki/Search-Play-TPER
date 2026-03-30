@@ -64,10 +64,10 @@ public class ConfigServlet extends HttpServlet {
 			
 			
 			log.info("\n"
-					+ "  ╔══════════════════════════════════════════════╗\n"
-					+ "  ║         SP_Lite  v" + version + "                    ║\n"
-					+ "  ║         STATUS : STARTING                    ║\n"
-					+ "  ╚══════════════════════════════════════════════╝\n"
+					+ "  +----------------------------------------------+\n"
+					+ "  |         SP_Lite  v" + version + "                    |\n"
+					+ "  |         STATUS : STARTING                    |\n"
+					+ "  +----------------------------------------------+\n"
 					+ "  config : " + ConfigLocation);
 			
 							
@@ -83,10 +83,10 @@ public class ConfigServlet extends HttpServlet {
 	@Override
 	public void destroy() {
 		log.info("\n"
-				+ "  ╔══════════════════════════════════════════════╗\n"
-				+ "  ║         SP_Lite  v" + version + "                    ║\n"
-				+ "  ║         STATUS : STOPPED                     ║\n"
-				+ "  ╚══════════════════════════════════════════════╝");
+				+ "  +----------------------------------------------+\n"
+				+ "  |         SP_Lite  v" + version + "                    |\n"
+				+ "  |         STATUS : STOPPED                     |\n"
+				+ "  +----------------------------------------------+");
 		super.destroy();
 	}
 
