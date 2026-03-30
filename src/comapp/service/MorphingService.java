@@ -67,6 +67,14 @@ public class MorphingService {
             silenceAudio = removeNSeconds(audioMono, nSeconds);
             audioFormat = silenceAudio.getFormat();
             log.info("MorphingService.processAudio() - AudioFormat after removeNSeconds: " + audioFormat);
+
+            // Guard: if trim produced empty audio, skip morphing
+            if (silenceAudio.getFrameLength() == 0) {
+                log.warning("MorphingService.processAudio() - Audio is empty after trimming first "
+                        + nSeconds + "s. Recording too short to process.");
+                return null;
+            }
+
             log.info("MorphingService.processAudio() - Applying changeVoice "
                     + "(pitchFactor=" + pitchFactor + ", camouflageFactor=" + camouflageFactor + ")...");
             try {
@@ -154,6 +162,11 @@ public class MorphingService {
 
         byte[] audioBytes = silenceAudio.readAllBytes();
         log.info("MorphingService.changeVoice() - Read " + audioBytes.length + " bytes from silenceAudio.");
+
+        if (audioBytes.length == 0) {
+            log.warning("MorphingService.changeVoice() - Empty audio input, returning silent stream.");
+            return new AudioInputStream(new ByteArrayInputStream(new byte[0]), format, 0);
+        }
 
         byte[] pitchedAudio = null;
         try {
