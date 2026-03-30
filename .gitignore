@@ -19,3 +19,15 @@ target/
 # OS files
 Thumbs.db
 .DS_Store
+
+# Sensitive config (contains DB credentials)
+webapp/META-INF/context.xml
+
+# Binary libs (too large for git)
+webapp/WEB-INF/lib/
+
+# Sensitive config (contains DB credentials)
+webapp/META-INF/context.xml
+
+# Binary libs (too large for git)
+webapp/WEB-INF/lib/
