@@ -22,24 +22,18 @@ public class CSVReport {
         File file = new File(fileName);
        
         try {
-            // Creare la directory dei log se non esiste
             File folder = new File(FOLDER_PATH);
             if (!folder.exists()) folder.mkdirs();
 
-            // Validare input
             if (!isInputValido(username, azione)) {
                 log.log(Level.WARNING, "Dati non validi: Username o Azione mancante");
                 return;
             }
-
-            // Creare il file CSV se non esiste e aggiungere l'intestazione
             if (!file.exists()) {
                 try (FileWriter writer = new FileWriter(file, true)) {
                     writer.write("Username;Timestamp;Azione;Dettagli\n");
                 }
             }
-
-            // Aggiungi la nuova riga al file
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(file, true))) {
             	 String nuovaRiga = null;
                 String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
@@ -49,15 +43,13 @@ public class CSVReport {
                 	nuovaRiga = String.format("%s;%s;%s;%s", username, timestamp.toString(), azione, dettagli);
  
                 writer.write(nuovaRiga);
-                writer.newLine(); // Andare a capo
+                writer.newLine();
             }
 
         } catch (IOException e) {
             System.err.println("Errore durante la scrittura nel file CSV: " + e.getMessage());
         }
     }
-
-	// Validiamo l'input
 	private static boolean isInputValido(String username, String azione) {
         return username != null && !username.trim().isEmpty() &&
                azione != null && !azione.trim().isEmpty();

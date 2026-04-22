@@ -65,15 +65,14 @@ public class Genesys {
 			RequestConfig conf = RequestConfig.custom().setConnectTimeout(3 * 1000).setConnectionRequestTimeout(3 * 1000).setSocketTimeout(3 * 1000).build(); // fix 23/09/2021
 
 			httpClient = HttpClientBuilder.create().setDefaultRequestConfig(conf).build();
-			log.log(Level.INFO, "urlString:" + urlString);
 			HttpPost httppost = new HttpPost(urlString);
 			List<BasicNameValuePair> params = new ArrayList<>();
 			if (code == null) {
 				params.add(new BasicNameValuePair("grant_type", "client_credentials"));
-				log.log(Level.INFO, "client_credentials");
+				log.info("getToken | grant=client_credentials region=" + urlRegion);
 			} else {
 				params.add(new BasicNameValuePair("grant_type", "authorization_code"));
-				log.log(Level.INFO, "client_credentials: authorization_code code: " + code + " redirect_uri:" + redirect_uri);
+				log.info("getToken | grant=authorization_code region=" + urlRegion);
 				params.add(new BasicNameValuePair("code", code));
 				params.add(new BasicNameValuePair("redirect_uri", redirect_uri));
 			}
@@ -81,7 +80,6 @@ public class Genesys {
 			// params.add(new BasicNameValuePair("grant_type", "client_credentials"));
 
 			httppost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
-			log.log(Level.INFO, "authorization: Basic " + Base64.getEncoder().encodeToString((clientId + ":" + clientSecret).getBytes()));
 			httppost.addHeader("authorization", "Basic " + Base64.getEncoder().encodeToString((clientId + ":" + clientSecret).getBytes()));
 			httppost.addHeader("content-type", "application/x-www-form-urlencoded");
 
@@ -93,18 +91,17 @@ public class Genesys {
 			// "error": "optional-error-message"
 			// }
 			String jsonString = IOUtils.toString(res.getEntity().getContent(), StandardCharsets.UTF_8);
-			log.log(Level.INFO, jsonString);
 			if (jsonString != null) {
 				JSONObject jo = new JSONObject(jsonString);
 				Calendar cal = Calendar.getInstance();
 				cal.add(Calendar.SECOND, jo.getInt("expires_in") - 60);
 				jo.put("expires_at", cal.getTimeInMillis());
-				log.log(Level.INFO, "get token end: " + jo.getString("access_token"));
+				log.info("getToken | ok, expires_in=" + jo.getInt("expires_in") + "s");
 				return jo;
 			}
 
 		} catch (Exception e) {
-			log.log(Level.INFO, "retrieve token", e);
+			log.log(Level.WARNING, "getToken | failed", e);
 		} finally {
 			try {
 				res.close();
@@ -1347,7 +1344,6 @@ public class Genesys {
 		httppost.addHeader("content-type", contenttype);
 		
 		if (StringUtils.isNotBlank(token)) {
-			log.log(Level.INFO, "httppost.addHeader(\"Authorization\", \"Bearer " + token + ");");
 			httppost.addHeader("Authorization", "Bearer " + "" + token);
 		}
 		int status = 0;
@@ -1388,7 +1384,7 @@ public class Genesys {
 		}
 		jRes.put("http_status_code", status);
 		jRes.put("jsonString", jsonString);
-		log.log(Level.INFO, "[" + sessionId + "] - engage url: " + url + " end response : " + jRes);
+		log.log(Level.INFO, "[" + sessionId + "] - engage url: " + url + " end response status: " + status + " jsonString length: " + jsonString.length());
 
 		return jRes;
 	}
@@ -1413,7 +1409,6 @@ public class Genesys {
 				HttpGet httpget = new HttpGet(url);
 				httpget.addHeader("Accept-Charset", "utf-8");
 				if (StringUtils.isNotBlank(token)) {
-					log.log(Level.INFO, "httpget.addHeader(\"Authorization\", \"Bearer " + token + ");");
 					httpget.addHeader("Authorization", "Bearer " + "" + token);
 				}
 				httpget.addHeader("content-type", "application/json");
@@ -1444,7 +1439,7 @@ public class Genesys {
 		}
 		jres.put("http_status_code", status);
 		jres.put("jsonString", jsonString);
-		log.log(Level.INFO, "[" + sessionId + "] - engage url: " + url + " end status : " + status + " jsonString: " + jsonString);
+		log.log(Level.INFO, "[" + sessionId + "] - engage url: " + url + " end status : " + status + " jsonString length: " + jsonString.length());
 
 		return jres;
 	}
@@ -1478,7 +1473,6 @@ public class Genesys {
 
 		httpPut.addHeader("content-type", contenttype);
 		if (StringUtils.isNotBlank(token)) {
-			log.log(Level.INFO, "httpPut.addHeader(\"Authorization\", \"Bearer " + token + ");");
 			httpPut.addHeader("Authorization", "Bearer " + "" + token);
 		}
 		int status = 0;
@@ -1554,7 +1548,6 @@ public class Genesys {
 
 		httpPatch.addHeader("content-type", contenttype);
 		if (StringUtils.isNotBlank(token)) {
-			log.log(Level.INFO, "httpPatch.addHeader(\"Authorization\", \"Bearer " + token + ");");
 			httpPatch.addHeader("Authorization", "Bearer " + "" + token);
 		}
 		int status = 0;
@@ -2494,7 +2487,7 @@ public class Genesys {
 	}
 	
 
-	public static String getAudioUrl(GenesysUser guser, JSONObject jo, AudioType format, File file, String urlDownload, String oriUrlDownload) throws Exception {
+	public static String getAudioUrl(GenesysUser guser, JSONObject jo, AudioType format, String urlDownload, String oriUrlDownload) throws Exception {
 		try {
 			String selfUri = jo.getString("selfUri");
 			String id = jo.getString("id");
@@ -2548,7 +2541,7 @@ public class Genesys {
 			String mediaUri2 = mediaUri;
 			if (StringUtils.isNotBlank(oriUrlDownload) && StringUtils.isNotBlank(urlDownload))
 				mediaUri2 = StringUtils.replace(mediaUri, oriUrlDownload, urlDownload);
-			log.log(Level.INFO, "[" + guser.sessionId + "," + id + "] - download: " + mediaUri2 + "\n    ori: " + mediaUri);
+			log.log(Level.INFO, "[" + guser.sessionId + "," + id + "] - download URL obtained");
 //			downloadFile(file, mediaUri2);
 			log.log(Level.INFO, "[" + guser.sessionId + "," + id + "] - copy completed");
 			return mediaUri2;

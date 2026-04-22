@@ -147,7 +147,8 @@ public class AnalyzerRepository {
         dataSql.append("MAX(c.conversationend) AS conversationend, ");
         dataSql.append("MAX(s.ani) AS ani, MAX(s.dnis) AS dnis, ");
         dataSql.append("STRING_AGG(DISTINCT cq.name, ', ') AS queue_name, ");
-        dataSql.append("STRING_AGG(DISTINCT cu.name, ', ') AS operator_name ");
+        dataSql.append("STRING_AGG(DISTINCT cu.name, ', ') AS operator_name, ");
+        dataSql.append("BOOL_OR(c.retention_locked) AS retention_locked ");
         dataSql.append("FROM PagedCalls paged ");
         dataSql.append("JOIN conversations c ON paged.conversationid = c.conversationid ");
         dataSql.append("LEFT JOIN participants p ON c.conversationid = p.conversationid ");
@@ -190,6 +191,7 @@ public class AnalyzerRepository {
                         row.put("dnis", rs.getString("dnis"));
                         row.put("queue_name", rs.getString("queue_name"));
                         row.put("operator_name", rs.getString("operator_name"));
+                        row.put("retention_locked", String.valueOf(rs.getBoolean("retention_locked")));
                         results.add(row);
                     }
                 }
@@ -208,5 +210,20 @@ public class AnalyzerRepository {
         response.put("results", results);
         response.put("totalCount", totalCount);
         return response;
+    }
+
+    public void saveRetentionLocked(String conversationId, boolean locked) {
+        String sql = "UPDATE conversations SET retention_locked = ? WHERE conversationid = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setBoolean(1, locked);
+            ps.setString(2, conversationId);
+            int updated = ps.executeUpdate();
+            log.info("AnalyzerRepository.saveRetentionLocked() - conversationId=" + conversationId
+                    + " locked=" + locked + " rows=" + updated);
+        } catch (Exception e) {
+            log.log(Level.SEVERE,
+                    "AnalyzerRepository.saveRetentionLocked() - Error for conversationId=" + conversationId, e);
+        }
     }
 }

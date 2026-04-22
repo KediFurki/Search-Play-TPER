@@ -11,10 +11,6 @@ public class GenesysCloud202Exception extends Exception {
 		super(""+jRes);
 		this.jRes = jRes;
 	}
-
-	/**
-	 * 
-	 */
 	private static final long serialVersionUID = 1L;
 
 }

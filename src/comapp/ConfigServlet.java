@@ -23,8 +23,6 @@ public class ConfigServlet extends HttpServlet {
 	public static String ConfigLocation;
 	public static Logger log = Logger.getLogger("comapp." + ConfigServlet.class.getName());
 	public static String web_app = "";
-
-	// --- Properties cache fields ---
 	private static volatile Properties cachedProperties = null;
 	private static volatile long cachedFileLastModified = 0;
 	private static final Object propertiesLock = new Object();
@@ -65,7 +63,7 @@ public class ConfigServlet extends HttpServlet {
 			
 			log.info("\n"
 					+ "  +----------------------------------------------+\n"
-					+ "  |         SP_Lite  v" + version + "                    |\n"
+					+ "  |         SP_Lite  v" + version + "                      |\n"
 					+ "  |         STATUS : STARTING                    |\n"
 					+ "  +----------------------------------------------+\n"
 					+ "  config : " + ConfigLocation);
@@ -84,7 +82,7 @@ public class ConfigServlet extends HttpServlet {
 	public void destroy() {
 		log.info("\n"
 				+ "  +----------------------------------------------+\n"
-				+ "  |         SP_Lite  v" + version + "                    |\n"
+				+ "  |         SP_Lite  v" + version + "                      |\n"
 				+ "  |         STATUS : STOPPED                     |\n"
 				+ "  +----------------------------------------------+");
 		super.destroy();
@@ -94,15 +92,10 @@ public class ConfigServlet extends HttpServlet {
 		try {
 			File configFile = new File(ConfigServlet.ConfigLocation);
 			long currentLastModified = configFile.lastModified();
-
-			// Fast path: return cached properties if file has not changed
 			if (cachedProperties != null && currentLastModified == cachedFileLastModified) {
 				return cachedProperties;
 			}
-
-			// Slow path: file changed or first load — synchronize and re-read
 			synchronized (propertiesLock) {
-				// Double-check: another thread may have already reloaded
 				currentLastModified = configFile.lastModified();
 				if (cachedProperties != null && currentLastModified == cachedFileLastModified) {
 					return cachedProperties;
@@ -125,7 +118,6 @@ public class ConfigServlet extends HttpServlet {
 			}
 		} catch (Exception e) {
 			log.log(Level.SEVERE, "Config Servlet Exception : ", e);
-			// If cache exists, return stale cache rather than null
 			if (cachedProperties != null) {
 				log.warning("getProperties() - Returning stale cached properties due to reload failure.");
 				return cachedProperties;

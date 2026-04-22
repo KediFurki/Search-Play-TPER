@@ -43,12 +43,6 @@ public class GenesysUser  {
 	String presenceTableName = "presence";
 	String conf_userTable = "conf_user";
 
-	
-
-	
-
-	
-
 	public String getCode() {
 		return code;
 	}

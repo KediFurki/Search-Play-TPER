@@ -268,10 +268,11 @@
                                 <span style="width:30px; cursor:pointer;" uk-icon="icon: play-circle;"
                                       onclick="playAudio('row-${st.index}', '${call.conversationid}')"></span>
                                 <button type="button" class="uk-icon-button"
-                                        data-locked="false"
-                                        uk-icon="icon: unlock"
+                                        data-locked="${call.retention_locked}"
+                                        uk-icon="icon: ${call.retention_locked == 'true' ? 'lock' : 'unlock'}"
                                         onclick="toggleRetention(this, '${call.conversationid}', '${call.conversationstart}')"
-                                        title="Retention: 90 Days (Click to Lock for 17 Years)"
+                                        title="${call.retention_locked == 'true' ? 'Locked: 17 Years (Click to Unlock)' : 'Retention: 90 Days (Click to Lock for 17 Years)'}"
+                                        style="${call.retention_locked == 'true' ? 'background-color:#44444E;color:#fff;' : ''}"
                                         uk-tooltip></button>
                             </td>
                         </tr>
