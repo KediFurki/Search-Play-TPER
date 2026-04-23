@@ -27,6 +27,15 @@ public class TperService {
     private final MorphingService morphingService = new MorphingService();
     private final AnalyzerRepository analyzerRepository = new AnalyzerRepository();
 
+    private static String shortSid(String sid) {
+        if (sid == null || sid.length() <= 8) return sid == null ? "-" : sid;
+        return sid.substring(sid.length() - 8);
+    }
+    private static String ctx(String sid, GenesysUser g) {
+        String who = (g == null) ? "-" : g.getLogId();
+        return "[sid=" + shortSid(sid) + " user=" + who + "]";
+    }
+
     private synchronized comapp.cloud.GenesysUser getTperSystemUser(String sessionId) throws Exception {
         if (tperSystemUser == null) {
             java.util.Properties props = comapp.ConfigServlet.getProperties();
@@ -50,10 +59,15 @@ public class TperService {
                                                   List<String> userGroups, boolean enableGroupFilter,
                                                   int pageNumber, int pageSize, String order) {
 
-        log.info("[" + sessionId + "] searchCalls | range=" + sStart + "~" + sEnd
-                + " ani=" + ani + " dnis=" + dnis + " convId=" + conversationId
-                + " queue=" + queue + " page=" + pageNumber + "/" + pageSize);
+        log.info(ctx(sessionId, guser) + " search.db | START range=" + sStart + "~" + sEnd
+                + " ani=" + (ani==null||ani.isEmpty()?"-":ani)
+                + " dnis=" + (dnis==null||dnis.isEmpty()?"-":dnis)
+                + " convId=" + (conversationId==null||conversationId.isEmpty()?"-":conversationId)
+                + " queue=" + (queue==null||queue.isEmpty()?"-":queue)
+                + " page=" + pageNumber + "/" + pageSize
+                + " groupFilter=" + enableGroupFilter);
         Map<String, Object> result = null;
+        long t0 = System.currentTimeMillis();
         try {
             result = analyzerRepository.searchCallsInDatabase(
                     sStart, sEnd, ani, dnis,
@@ -61,62 +75,73 @@ public class TperService {
                     userGroups, enableGroupFilter,
                     pageNumber, pageSize, order);
 
+            long dur = System.currentTimeMillis() - t0;
             if (result != null) {
-                log.info("[" + sessionId + "] searchCalls | total=" + result.get("totalCount")
-                        + " returned=" + ((List<?>) result.get("results")).size());
+                log.info(ctx(sessionId, guser) + " search.db | DONE total=" + result.get("totalCount")
+                        + " returned=" + ((List<?>) result.get("results")).size()
+                        + " took=" + dur + "ms");
             } else {
-                log.warning("[" + sessionId + "] searchCalls | db returned null");
+                log.warning(ctx(sessionId, guser) + " search.db | DONE result=null took=" + dur + "ms");
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "[" + sessionId + "] searchCalls | failed", e);
+            log.log(Level.SEVERE, ctx(sessionId, guser) + " search.db | FAILED took="
+                    + (System.currentTimeMillis() - t0) + "ms", e);
         }
         return result;
     }
     public InputStream getMorphedAudioStream(String sessionId, GenesysUser guser,
                                              String conversationId) {
-        log.info("[" + sessionId + "] getMorphedAudio | convId=" + conversationId);
+        log.info(ctx(sessionId, guser) + " audio.fetch | START convId=" + conversationId);
         InputStream morphedStream = null;
+        long t0 = System.currentTimeMillis();
         try {
             JSONArray recorderList = Genesys.getRecorderList(getTperSystemUser(sessionId), conversationId, AudioType.WAV);
 
             if (recorderList == null || recorderList.length() == 0) {
-                log.warning("[" + sessionId + "] getMorphedAudio | no recordings, convId=" + conversationId);
+                log.warning(ctx(sessionId, guser) + " audio.fetch | no recordings convId=" + conversationId);
                 return null;
             }
             String audioUrl = Genesys.getAudioUrl(getTperSystemUser(sessionId), recorderList.getJSONObject(0),
                                                    AudioType.WAV, null, null);
 
             if (audioUrl == null || audioUrl.isBlank()) {
-                log.warning("[" + sessionId + "] getMorphedAudio | no audio URL, convId=" + conversationId);
+                log.warning(ctx(sessionId, guser) + " audio.fetch | no audio URL convId=" + conversationId);
                 return null;
             }
             audioUrl = audioUrl.replaceAll("\"", "");
-            log.info("[" + sessionId + "] getMorphedAudio | " + recorderList.length() + " recording(s), morphing convId=" + conversationId);
+            log.info(ctx(sessionId, guser) + " audio.fetch | recordings=" + recorderList.length()
+                    + " morphing convId=" + conversationId);
             morphedStream = morphingService.processAudio(audioUrl);
+            long dur = System.currentTimeMillis() - t0;
             if (morphedStream == null) {
-                log.warning("[" + sessionId + "] getMorphedAudio | morphing returned null, convId=" + conversationId);
+                log.warning(ctx(sessionId, guser) + " audio.fetch | morph=null convId=" + conversationId
+                        + " took=" + dur + "ms");
+            } else {
+                log.info(ctx(sessionId, guser) + " audio.fetch | DONE convId=" + conversationId
+                        + " took=" + dur + "ms");
             }
         } catch (Exception e) {
-            log.log(Level.SEVERE, "[" + sessionId + "] getMorphedAudio | failed, convId=" + conversationId, e);
+            log.log(Level.SEVERE, ctx(sessionId, guser) + " audio.fetch | FAILED convId=" + conversationId, e);
         }
         return morphedStream;
     }
     public boolean extendPersonalRetention(String sessionId, GenesysUser guser,
                                            String conversationId, String conversationStart) {
-        log.info("[" + sessionId + "] extendRetention | convId=" + conversationId + " start=" + conversationStart);
+        log.info(ctx(sessionId, guser) + " retention.lock | START convId=" + conversationId
+                + " start=" + conversationStart);
         try {
             if (conversationId == null || conversationId.isBlank()) {
-                log.warning("[" + sessionId + "] extendRetention | convId is blank");
+                log.warning(ctx(sessionId, guser) + " retention.lock | convId blank");
                 return false;
             }
             if (conversationStart == null || conversationStart.isBlank()) {
-                log.warning("[" + sessionId + "] extendRetention | convStart is blank");
+                log.warning(ctx(sessionId, guser) + " retention.lock | convStart blank");
                 return false;
             }
             int yearsToKeep = Integer.parseInt(
                     ConfigServlet.getProperties().getProperty("retention.years", "17"));
             if (yearsToKeep <= 0) {
-                log.warning("[" + sessionId + "] extendRetention | invalid years=" + yearsToKeep);
+                log.warning(ctx(sessionId, guser) + " retention.lock | invalid years=" + yearsToKeep);
                 return false;
             }
             ZonedDateTime startDate = ZonedDateTime.parse(conversationStart,
@@ -127,29 +152,31 @@ public class TperService {
             if (recordings == null || recordings.length() == 0) {
                 throw new Exception("No recordings found for conversation " + conversationId);
             }
-            log.info("[" + sessionId + "] extendRetention | " + recordings.length() + " rec(s), deleteDate=" + deleteDate);
+            log.info(ctx(sessionId, guser) + " retention.lock | recordings=" + recordings.length()
+                    + " deleteDate=" + deleteDate);
             for (int i = 0; i < recordings.length(); i++) {
                 String recId = recordings.getJSONObject(i).getString("id");
                 Genesys.updateRecordingRetention(getTperSystemUser(sessionId), conversationId, recId, deleteDate);
             }
-            log.info("[" + sessionId + "] extendRetention | done, convId=" + conversationId);
             analyzerRepository.saveRetentionLocked(conversationId, true);
+            log.info(ctx(sessionId, guser) + " retention.lock | DONE convId=" + conversationId);
             return true;
         } catch (Exception e) {
-            log.log(Level.SEVERE, "[" + sessionId + "] extendRetention | failed, convId=" + conversationId, e);
+            log.log(Level.SEVERE, ctx(sessionId, guser) + " retention.lock | FAILED convId=" + conversationId, e);
             return false;
         }
     }
     public boolean revertPersonalRetention(String sessionId, GenesysUser guser,
                                            String conversationId, String conversationStart) {
-        log.info("[" + sessionId + "] revertRetention | convId=" + conversationId + " start=" + conversationStart);
+        log.info(ctx(sessionId, guser) + " retention.unlock | START convId=" + conversationId
+                + " start=" + conversationStart);
         try {
             if (conversationId == null || conversationId.isBlank()) {
-                log.warning("[" + sessionId + "] revertRetention | convId is blank");
+                log.warning(ctx(sessionId, guser) + " retention.unlock | convId blank");
                 return false;
             }
             if (conversationStart == null || conversationStart.isBlank()) {
-                log.warning("[" + sessionId + "] revertRetention | convStart is blank");
+                log.warning(ctx(sessionId, guser) + " retention.unlock | convStart blank");
                 return false;
             }
             ZonedDateTime startDate = ZonedDateTime.parse(conversationStart,
@@ -162,16 +189,17 @@ public class TperService {
             if (recordings == null || recordings.length() == 0) {
                 throw new Exception("No recordings found for conversation " + conversationId);
             }
-            log.info("[" + sessionId + "] revertRetention | " + recordings.length() + " rec(s), deleteDate=" + deleteDate + " (in " + daysFromNow + "d)");
+            log.info(ctx(sessionId, guser) + " retention.unlock | recordings=" + recordings.length()
+                    + " deleteDate=" + deleteDate + " (in " + daysFromNow + "d)");
             for (int i = 0; i < recordings.length(); i++) {
                 String recId = recordings.getJSONObject(i).getString("id");
                 Genesys.updateRecordingRetention(getTperSystemUser(sessionId), conversationId, recId, deleteDate);
             }
-            log.info("[" + sessionId + "] revertRetention | done, convId=" + conversationId);
             analyzerRepository.saveRetentionLocked(conversationId, false);
+            log.info(ctx(sessionId, guser) + " retention.unlock | DONE convId=" + conversationId);
             return true;
         } catch (Exception e) {
-            log.log(Level.SEVERE, "[" + sessionId + "] revertRetention | failed, convId=" + conversationId, e);
+            log.log(Level.SEVERE, ctx(sessionId, guser) + " retention.unlock | FAILED convId=" + conversationId, e);
             return false;
         }
     }

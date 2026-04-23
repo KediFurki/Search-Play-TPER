@@ -36,6 +36,40 @@ public class GenesysUser  {
 	public Object syncObjectUsers = new Object();
 
 	private List<String> userGroups = new ArrayList<>();
+	private List<String> userGroupIds = new ArrayList<>();
+
+	private String userId = "";
+	private String userName = "";
+	private String userEmail = "";
+
+	public String getUserId() { return userId; }
+	public void setUserId(String userId) { this.userId = userId; }
+
+	public String getUserName() { return userName; }
+	public void setUserName(String userName) { this.userName = userName; }
+
+	public String getUserEmail() { return userEmail; }
+	public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
+
+	/**
+	 * Short, log-friendly identity string, e.g. "Ada Lovelace <ada@x.com>" or "-".
+	 */
+	public String getLogId() {
+		String n = StringUtils.isNotBlank(userName)  ? userName  : "?";
+		String e = StringUtils.isNotBlank(userEmail) ? userEmail : "";
+		if (StringUtils.isBlank(userName) && StringUtils.isBlank(userEmail)) {
+			return "-";
+		}
+		return e.isEmpty() ? n : (n + " <" + e + ">");
+	}
+
+	public List<String> getUserGroupIds() {
+		return userGroupIds;
+	}
+
+	public void setUserGroupIds(List<String> userGroupIds) {
+		this.userGroupIds = userGroupIds;
+	}
 
 
 
